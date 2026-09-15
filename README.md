@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Spiellogik (node:test, 15 Tests)
+npm test      # Spiellogik, Balance und Service Worker (node:test, 22 Tests)
 ```
 
 ## Spielablauf
@@ -21,15 +21,36 @@ npm test      # Spiellogik (node:test, 15 Tests)
 
 | Regel | Wert | wo einstellbar |
 | --- | --- | --- |
-| Gesamtzeit | 50 s für den ganzen Durchlauf | `js/config.js` → `totalMs` |
+| Startzeit | 30 s | `js/config.js` → `totalMs` |
 | Zahlen in Runde 1 | 3 | `baseCount` |
 | Steigerung | jede 2. Runde eine Zahl mehr | `growEvery` |
 | Raster | 3×3, ab 10 Zahlen 4×4, ab 17 dann 5×5 | `js/level.js` → `levelSpec` |
 | Fehler | kosten nur die Zeit, die sie brauchen | `wrongPenaltyMs` |
-| Rundenbonus | keiner | `levelBonusMs` |
+| Rundenbonus | +4 s pro geschaffter Runde | `levelBonusMs` |
 
-Zeitstrafe und Rundenbonus sind bereits eingebaut, stehen aber auf `0` – so verhält
-sich der Prototyp wie das Original.
+### Schwierigkeitsgrad
+
+Die Uhr startet knapp und wird verdient: Jede geschaffte Runde legt 4 Sekunden drauf,
+kurz neben der Uhr als `+4 s` eingeblendet. Damit endet ein Durchlauf nicht nach einer
+festen Zeit, sondern genau dann, wenn eine Runde mehr kostet, als sie einbringt – und
+weil alle zwei Runden eine Zahl dazukommt, passiert das unvermeidlich.
+
+Die Zahlen sind nicht geraten, sondern simuliert: `tools/balance.mjs` spielt Durchläufe
+gegen die echte Spiellogik, mit einem groben Modell für Einprägen, Tippen und Vertippen.
+
+```bash
+node tools/balance.mjs
+```
+
+| Spieler | vorher (50 s, kein Bonus) | jetzt (30 s, +4 s) |
+| --- | --- | --- |
+| schnell | 13 Runden, 50 s, nur 3×3 | 25 Runden, 130 s, bis 4×4 |
+| mittel | 11 Runden, 51 s, nur 3×3 | 17 Runden, 100 s, bis 4×4 |
+| langsam | 8,8 Runden, 52 s, nur 3×3 | 11,7 Runden, 77 s, nur 3×3 |
+
+Vorher war das größere Raster toter Code: Das 4×4 beginnt in Runde 15, die in 50 Sekunden
+niemand erreicht. Jetzt ist es der Lohn fürs Gutspielen. Die Zeitstrafe pro Fehltipp
+(`wrongPenaltyMs`) bleibt bei `0` – Fehler kosten die Zeit, die sie brauchen, das reicht.
 
 ## Was gegenüber der Vorlage anders ist
 
@@ -44,6 +65,7 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Wechselt man den Tab, hält die Uhr an, statt den Lauf zu verschenken.
 - Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop.
 - Rekord (Runden + Zahlen) bleibt im `localStorage`.
+- Läuft offline: ein Service Worker legt den kompletten App-Shell in den Cache.
 - Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `Esc` bricht ab.
 - `prefers-reduced-motion` schaltet die Animationen ab.
 
@@ -59,7 +81,11 @@ js/board-view.js      Raster im DOM, Eingaben, Animationen
 js/feedback.js        Töne (Web Audio) und Vibration
 js/storage.js         Rekord und Ton-Einstellung
 js/main.js            verdrahtet alles und hält die Uhr am Laufen
+sw.js                 Service Worker: App-Shell im Cache, damit es offline läuft
+tools/balance.mjs     Simulation für die Balance (kein Teil der Web-App)
 test/game.test.mjs    Tests für Rundenplan, Regeln, Uhr, Pause
+test/balance.test.mjs hält die Balance grob an Ort und Stelle
+test/sw.test.mjs      prüft, dass der Cache wirklich alle Dateien kennt
 ```
 
 Die Spiellogik kennt weder DOM noch `Date.now()` – die Zeit wird ihr von außen
@@ -73,8 +99,36 @@ gereicht. Deshalb laufen die Tests ohne Browser und ohne Warten.
 Solche Läufe zählen nur die Runden, die man wirklich gespielt hat – übersprungene
 Runden gehen nicht in die Auswertung ein, und der Rekord bleibt unberührt.
 
-## Noch offen
+## Offline
 
-- Service Worker, damit die App offline läuft (das Manifest liegt schon bereit).
-- Deployment auf GitHub Pages.
-- Feinschliff am Schwierigkeitsgrad: Tempo der Steigerung, Zeitbonus pro Runde.
+Beim ersten Besuch wandert der komplette App-Shell in einen versionierten Cache,
+danach startet das Spiel auch ohne Netz (`sw.js`). Weil es keinen Build und damit
+keine gehashten Dateinamen gibt, liegt immer nur *ein* Stand im Cache – eine neue
+`main.js` kann also nie auf eine alte `game.js` treffen.
+
+**Nach jeder Änderung an den ausgelieferten Dateien `VERSION` in `sw.js` hochzählen**
+(`v1` → `v2`). Das ist das Release-Signal: Der Browser erkennt das geänderte Skript,
+installiert den neuen Cache und wirft den alten weg. Ohne Bump bleiben Besucher auf
+dem alten Stand. `npm test` prüft immerhin, dass keine Datei in der Liste fehlt.
+
+## Deployment
+
+`.github/workflows/pages.yml` erledigt beides: Bei jedem Push und bei jedem Pull
+Request laufen die Tests, und was auf `main` landet, veröffentlicht GitHub Pages
+anschließend automatisch – ohne Build, es wird nur kopiert:
+
+<https://ilianp.github.io/Ascending-numbers-memory/>
+
+Ausgeliefert werden nur `index.html`, `manifest.webmanifest`, `sw.js`, `css/`,
+`js/` und `icons/`; Tests und Workflow bleiben draußen. Alle Pfade sind relativ,
+deshalb stört das Unterverzeichnis der Projektseite weder Manifest noch Service
+Worker.
+
+> **Einmalig nötig:** in *Settings → Pages* als Quelle **GitHub Actions** wählen.
+> Ohne das schlägt der Deploy-Schritt fehl, die Tests laufen trotzdem.
+
+## Ideen für später
+
+- Hinweis in der App, wenn ein neuer Stand im Hintergrund bereitliegt („Neu laden“).
+- Rekord getrennt nach Rastergröße statt nur Runden und Zahlen.
+- Zeitstrafe für Fehltipps als optionaler „harter“ Modus.

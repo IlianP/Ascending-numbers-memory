@@ -123,7 +123,7 @@ button {
   white-space: nowrap;
 }
 
-.hud__center { display: grid; justify-items: center; gap: 6px; }
+.hud__center { position: relative; display: grid; justify-items: center; gap: 6px; }
 
 .clock {
   font-size: 22px;
@@ -152,6 +152,29 @@ button {
 }
 
 .clock--low ~ .clock__bar > i { background: var(--no); }
+
+/* Gewonnene Zeit kurz einblenden – sonst merkt man den Rundenbonus gar nicht. */
+.bonus {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ok);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bonus[data-on] { animation: bonus .9s ease-out; }
+
+@keyframes bonus {
+  0%   { opacity: 0; transform: translateY(5px); }
+  20%  { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-9px); }
+}
 
 .icon-btn {
   display: grid;

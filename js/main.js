@@ -14,6 +14,7 @@ const el = {
   flash: $('flash'),
   btnSound: $('btn-sound'),
   btnQuit: $('btn-quit'),
+  bonus: $('bonus'),
   board: $('board'),
   dots: $('dots'),
   action: $('action'),
@@ -64,7 +65,17 @@ function paintClock() {
   const left = game.remaining(now());
   el.clock.textContent = format(left);
   el.clock.classList.toggle('clock--low', left <= 10_000);
-  el.clockFill.style.transform = `scaleX(${Math.max(0, left / game.config.totalMs)})`;
+  // Mit Rundenbonus kann mehr Zeit da sein als am Start – der Balken bleibt dann voll.
+  const share = Math.min(1, Math.max(0, left / game.config.totalMs));
+  el.clockFill.style.transform = `scaleX(${share})`;
+}
+
+/** Gewonnene Sekunden kurz neben der Uhr zeigen. */
+function showBonus(ms) {
+  el.bonus.textContent = `+${Math.round(ms / 1000)} s`;
+  el.bonus.removeAttribute('data-on');
+  void el.bonus.offsetWidth; // Animation neu starten
+  el.bonus.dataset.on = '1';
 }
 
 function flash(kind) {
@@ -137,6 +148,10 @@ function onTap(cell) {
     fx.cue(levelDone ? 'level' : 'correct');
     if (levelDone) {
       view.celebrate();
+      if (game.config.levelBonusMs) {
+        showBonus(game.config.levelBonusMs);
+        paintClock();
+      }
       view.after('level', CONFIG.levelBreakMs, () => {
         if (game.phase === 'preview' || game.phase === 'playing') nextLevel();
       });
@@ -262,6 +277,13 @@ document.addEventListener('keydown', (event) => {
 });
 
 /* ------------------------------------------------------------------ Start */
+
+/* Offline-Betrieb ist ein Bonus: klappt die Registrierung nicht, läuft das Spiel trotzdem. */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 
 applySound();
 bestLine(el.bestIntro);
