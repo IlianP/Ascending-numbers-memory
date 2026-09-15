@@ -209,11 +209,36 @@ export async function openGame(path = '/index.html', viewport = { width: 390, he
     }
   }
 
-  /** Tastendruck auf die Seite - fuer die Kuerzel (Leertaste, Esc, N). */
+  /**
+   * Tastendruck auf die Seite - fuer die Kuerzel (Leertaste, Esc, N) und zum
+   * Tippen in ein Eingabefeld.
+   *
+   * `text` darf nur bei druckbaren Zeichen mitgeschickt werden: Chrome weist
+   * einen Tastendruck mit `text: 'Escape'` als ungueltig zurueck.
+   */
+  const NAMED_KEYS = { Escape: 27, Enter: 13, Tab: 9, Backspace: 8 };
+
   async function press(key) {
-    const common = { key, code: `Key${key.toUpperCase()}`, text: key, windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0) };
+    const common = NAMED_KEYS[key] !== undefined
+      ? { key, code: key, windowsVirtualKeyCode: NAMED_KEYS[key] }
+      : {
+          key,
+          code: key === ' ' ? 'Space' : /^[0-9]$/.test(key) ? `Digit${key}` : `Key${key.toUpperCase()}`,
+          text: key,
+          windowsVirtualKeyCode: key === ' ' ? 32 : key.toUpperCase().charCodeAt(0),
+        };
     await call('Input.dispatchKeyEvent', { type: 'keyDown', ...common });
     await call('Input.dispatchKeyEvent', { type: 'keyUp', ...common });
+  }
+
+  /**
+   * Text in ein Eingabefeld tippen - als echte Tastendruecke, nicht per
+   * `value =`. Nur so laeuft der Text durch dieselben Tastatur-Kuerzel wie beim
+   * Spielen, und genau das soll geprueft werden.
+   */
+  async function typeInto(selector, text) {
+    await click(selector);
+    for (const char of text) await press(char);
   }
 
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -225,5 +250,5 @@ export async function openGame(path = '/index.html', viewport = { width: 390, he
     await rm(profile, { recursive: true, force: true }).catch(() => {});
   }
 
-  return { evaluate, rect, click, press, wait, errors, close };
+  return { evaluate, rect, click, press, typeInto, wait, errors, close };
 }

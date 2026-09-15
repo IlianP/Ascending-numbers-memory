@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 31 Tests)
+npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 54 Tests)
 ```
 
 ## Spielablauf
@@ -66,6 +66,8 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop – die schmalen
   Fälle sind als Test festgehalten (320/360/390 px).
 - Rekord (Runden + Zahlen) bleibt im `localStorage`.
+- Bestenliste: die besten 50 Läufe auf dem Gerät, dazu eine optionale globale
+  Liste (siehe unten).
 - Läuft offline: ein Service Worker legt den kompletten App-Shell in den Cache.
 - Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `N` startet neu,
   `Esc` bricht ab.
@@ -91,6 +93,101 @@ Uhr und drei Knöpfen so voll, dass symmetrische Spalten (`1fr auto 1fr`) nicht 
 passen – die linke Spalte wird dann so breit wie die Knopfleiste rechts und schiebt den
 Beenden-Knopf aus dem Bild. Jede Seite nimmt jetzt nur, was sie braucht.
 
+## Bestenliste
+
+Zwei Listen, dieselbe Wertung: die besten 50 Läufe **auf dem Gerät**
+(`localStorage`) und, wenn ein Server hinterlegt ist, eine **globale** Liste
+dazu. Beide sind über die Trophäe auf der Start- und der Endkarte erreichbar –
+nicht im Kopfbereich, denn der ist bei 320 px schon voll (siehe oben).
+
+### Verglichen werden gefundene Zahlen, nicht geschaffte Runden
+
+Das sieht nach der kleineren Zahl aus, ist aber die feinere *und* die
+verträgliche: Wer mehr Runden schafft, hat zwangsläufig mehr Zahlen gefunden.
+Eine Runde ist erst geschafft, wenn alle ihre Zahlen sitzen, und die
+Rundengrößen wachsen monoton – wer L Runden schafft, hat also mindestens die
+Summe der ersten L Runden gefunden, und wer nur L-1 Runden schafft, kommt selbst
+mit einer fast fertigen Runde L nicht heran (`test/scores.test.mjs` rechnet das
+gegen den echten Rundenplan nach). Die Zahlen ordnen damit genau wie die Runden,
+unterscheiden aber zusätzlich die beiden, die bei „7 Runden" gleichauf wären:
+einer stand mitten in Runde 8, der andere hatte gerade erst verdeckt.
+
+Fehler zählen mit, kosten aber keinen Platz – weder als Abzug noch als
+Stichentscheid. Ein Fehltipp ist auf dem Handy eine Daumenbreite weit weg und
+kostet ohnehin die Zeit, die er braucht; ihn zusätzlich zu verrechnen würde die
+Eingabe bestrafen statt das Gedächtnis. Gespeichert werden ohnehin die
+Rohwerte (Runden, Zahlen, Fehler), nicht eine fertige Punktzahl: Eine spätere
+Wertung ließe sich damit rückwirkend nachrechnen, ohne dass jemand etwas neu
+spielen muss.
+
+Abgekürzte Läufe (`?zeit=`, `?runde=`) zählen nicht – genau wie beim Rekord. Die
+Endkarte sagt das auch dort, wo sonst der Knopf wäre, statt es zu verschweigen.
+
+### Gleichstand überholt nicht
+
+Wer dieselbe Zahl noch einmal erreicht, steht **hinter** dem älteren Eintrag.
+Diese Regel steht an vier Stellen und muss überall dieselbe sein, sonst markiert
+die Oberfläche die falsche Zeile: beim Speichern (stabil sortiert, der neue
+Eintrag wird hinten angehängt), in der Platzvorschau auf der Endkarte, in
+`ascending_top_scores` (`found desc, created_at asc, id asc`) und beim Zählen des
+Rangs in `ascending_submit_score`. Die eigene Zeile wird deshalb auch nicht über
+den gemeldeten Rang gesucht, sondern über die Werte: unter wertgleichen Zeilen
+die jüngste.
+
+### Ohne Netz ist nichts kaputt
+
+Das Spiel läuft offline, also muss es offline vollständig sein. Jeder Aufruf in
+`js/leaderboard.js` geht sanft daneben: kein Netz, kein eingerichteter Server,
+ein Filter dazwischen, Zeitüberschreitung – Lesen liefert `null`, und die
+Oberfläche zeigt die Liste vom Gerät. Eingetragen wird **immer zuerst lokal**,
+erst danach ins Netz; wer den Knopf gar nicht drückt, dessen Lauf landet
+spätestens beim Verlassen der Endkarte in der Liste. Ein Ergebnis darf nicht
+daran hängen, ob der Server gerade erreichbar war.
+
+Ein Aussetzer beim Senden wird bis zu dreimal wiederholt, danach wird der Knopf
+zum „Erneut versuchen" statt zur Sackgasse. Jeder Durchlauf trägt dabei eine
+eigene Kennung, die der Server als Idempotenz-Schlüssel benutzt: Geht die
+Antwort auf einem erfolgreichen Eintrag verloren, legt der Wiederholungsversuch
+keine zweite Zeile an. Und ein *abgelehnter* Eintrag wird nicht als „nicht
+erreichbar" gemeldet – das schickte nur auf die Suche nach einem Netzproblem,
+das es nicht gibt.
+
+### Einrichtung (einmalig, optional)
+
+1. Kostenloses [Supabase](https://supabase.com)-Projekt anlegen – oder eines
+   mitbenutzen, in dem schon eine andere Bestenliste liegt: Alle Namen tragen
+   das Präfix `ascending_` und kommen sich nicht ins Gehege.
+2. `docs/leaderboard-setup.sql` im SQL-Editor des Projekts ausführen. Die Datei
+   ist wiederholbar – sie erneut auszuführen ist der normale Weg, Änderungen
+   einzuspielen.
+3. Projekt-URL und öffentlichen anon-/publishable-Key in `js/leaderboard.js`
+   eintragen.
+
+Beide Werte gehören in den Browser: Der publishable Key ist dafür gemacht,
+ausgeliefert zu werden. Geschützt wird die Tabelle durch Row Level Security ohne
+jede Policy plus zwei SECURITY-DEFINER-Funktionen, die nur unbedenkliche Spalten
+herausgeben – nie die IP, nie den Rate-Limit-Schlüssel. Statt der IP wird nur ein
+täglich gesalzener Hash gespeichert. Der `service_role`-Key hat dort nichts
+verloren.
+
+**Ehrlich bleiben:** Der Browser meldet sein Ergebnis selbst. Manipulationssicher
+ist eine solche Liste nicht und kann es nicht sein. Die Prüfungen serverseitig
+halten groben Unfug ab (unmögliche Werte, Sturzfluten) – deshalb sind sie
+bewusst locker: Eine Prüfung, die echte Läufe abweist, kostet Funktionalität und
+bringt keine Sicherheit.
+
+Solange das SQL nicht eingespielt ist, antwortet der Server auf beide Funktionen
+mit 404. Das Spiel fällt dann still auf die Liste im Gerät zurück; der Reiter
+„Global" sagt, dass er gerade nicht erreichbar ist. Nichts bricht.
+
+### Die Serverhälfte testen
+
+`test/sql/rank-order.sql` prüft, was nur die Datenbank beantworten kann: dass der
+gemeldete Rang exakt die Listenposition ist (auch bei Gleichstand), dass
+dieselbe Kennung keine zweite Zeile anlegt und dass unmögliche Werte abgelehnt
+werden. Es läuft **gegen eine Wegwerf-Datenbank, nie gegen das Live-Projekt** –
+es leert die Tabelle am Anfang. Die nötigen Befehle stehen im Kopf der Datei.
+
 ## Aufbau
 
 ```
@@ -102,6 +199,8 @@ js/game.js            Regelwerk als Zustandsautomat, ohne DOM und ohne eigene Uh
 js/board-view.js      Raster im DOM, Eingaben, Animationen
 js/feedback.js        Töne (Web Audio) und Vibration
 js/storage.js         Rekord und Ton-Einstellung
+js/scores.js          Wertung eines Laufs und die Bestenliste auf dem Gerät (reine Logik)
+js/leaderboard.js     globale Bestenliste über Supabase – die einzige Datei mit Netzzugriff
 js/main.js            verdrahtet alles und hält die Uhr am Laufen
 sw.js                 Service Worker: App-Shell im Cache, damit es offline läuft
 tools/balance.mjs     Simulation für die Balance (kein Teil der Web-App)
@@ -110,7 +209,12 @@ test/balance.test.mjs hält die Balance grob an Ort und Stelle
 test/sw.test.mjs      prüft, dass der Cache wirklich alle Dateien kennt
 test/layout.test.mjs  misst im Browser, dass das Spielfeld still steht
 test/controls.test.mjs Ton-Schalter und Neustart im Browser
+test/scores.test.mjs  Wertung, Reihenfolge, Gleichstand, kaputte Daten
+test/leaderboard.test.mjs  die Netzschicht gegen einen gefälschten `fetch`
+test/leaderboard-ui.test.mjs  die Bestenliste im Browser, inklusive 320-px-Maßen
+test/sql/rank-order.sql  die Serverhälfte gegen eine Wegwerf-Datenbank (siehe unten)
 test/helpers/browser.mjs  Browser-Treiber über das DevTools-Protokoll
+docs/leaderboard-setup.sql  einmalig im Supabase-Projekt auszuführen
 ```
 
 ### Tests im Browser, ohne Abhängigkeiten
@@ -135,7 +239,8 @@ gereicht. Deshalb laufen die Tests ohne Browser und ohne Warten.
 10 Sekunden. Beides lässt sich kombinieren: `index.html?runde=15&zeit=10`.
 
 Solche Läufe zählen nur die Runden, die man wirklich gespielt hat – übersprungene
-Runden gehen nicht in die Auswertung ein, und der Rekord bleibt unberührt.
+Runden gehen nicht in die Auswertung ein, und weder Rekord noch Bestenliste
+werden davon berührt. Die Endkarte sagt das auch dazu.
 
 ## Offline
 
@@ -158,7 +263,8 @@ anschließend automatisch – ohne Build, es wird nur kopiert:
 <https://ilianp.github.io/Ascending-numbers-memory/>
 
 Ausgeliefert werden nur `index.html`, `manifest.webmanifest`, `sw.js`, `css/`,
-`js/` und `icons/`; Tests und Workflow bleiben draußen. Alle Pfade sind relativ,
+`js/` und `icons/`; Tests, Workflow und `docs/` bleiben draußen – das SQL gehört
+ins Supabase-Projekt, nicht auf die Seite. Alle Pfade sind relativ,
 deshalb stört das Unterverzeichnis der Projektseite weder Manifest noch Service
 Worker.
 
@@ -169,4 +275,8 @@ Worker.
 
 - Hinweis in der App, wenn ein neuer Stand im Hintergrund bereitliegt („Neu laden“).
 - Rekord getrennt nach Rastergröße statt nur Runden und Zahlen.
-- Zeitstrafe für Fehltipps als optionaler „harter“ Modus.
+- Zeitstrafe für Fehltipps als optionaler „harter“ Modus. Dafür ist die Wertung
+  schon vorbereitet: Jede Zeile trägt ihre Wertungsklasse (`mode`), ein solcher
+  Modus bekäme also seine eigene Liste, ohne dass Bestandsdaten angefasst werden.
+- Alter der Einträge in der Liste („vor 3 Tagen“) – der Zeitpunkt steht schon in
+  jeder Zeile und wartet nur darauf, angezeigt zu werden.
