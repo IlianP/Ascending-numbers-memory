@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0e11" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Merke dir die Zahlen im Raster und tippe sie danach verdeckt in aufsteigender Reihenfolge an.">
+<title>Ascending Numbers</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23111'/><text x='50' y='72' font-size='62' font-family='system-ui,sans-serif' font-weight='700' text-anchor='middle' fill='%23fff'>1</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ascending">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="hud" id="hud" aria-hidden="true">
+    <div class="hud__side">
+      <span class="pill" id="level-pill">Level 1</span>
+    </div>
+
+    <div class="hud__center">
+      <div class="clock" id="clock" role="timer" aria-live="off">00:50</div>
+      <div class="clock__bar"><i id="clock-fill"></i></div>
+    </div>
+
+    <div class="hud__side hud__side--end">
+      <span class="flash" id="flash" aria-hidden="true"></span>
+      <button class="icon-btn" id="btn-sound" type="button" aria-pressed="true" title="Ton an/aus">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 9.5h3.5L12 6v12L7.5 14.5H4z" fill="currentColor" stroke-linejoin="round"/>
+          <path class="icon-wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/>
+          <path class="icon-mute" d="M16 9.5l5 5m0-5l-5 5"/>
+        </svg>
+        <span class="visually-hidden">Ton an/aus</span>
+      </button>
+      <button class="icon-btn" id="btn-quit" type="button" title="Spiel beenden">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round">
+          <path d="M6 6l12 12M18 6L6 18"/>
+        </svg>
+        <span class="visually-hidden">Spiel beenden</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="stage">
+    <div class="board-wrap">
+      <div class="board" id="board" role="grid" aria-label="Spielfeld"></div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+    </div>
+
+    <button class="action" id="action" type="button" hidden>Verdecken</button>
+  </main>
+
+  <section class="sheet" id="sheet" aria-live="polite">
+    <div class="card" id="card-intro">
+      <h1>Ascending Numbers</h1>
+      <p class="lead">
+        Präge dir ein, wo die Zahlen liegen. Danach werden sie verdeckt &ndash;
+        tippe sie in aufsteigender Reihenfolge an, beginnend bei&nbsp;1.
+      </p>
+      <ul class="rules">
+        <li><b>50&nbsp;Sekunden</b> für das ganze Spiel</li>
+        <li>Jede zweite Runde kommt <b>eine Zahl dazu</b></li>
+        <li>Fehler kosten nur Zeit &ndash; also: ruhig bleiben</li>
+      </ul>
+      <button class="action action--lg" id="btn-start" type="button">Spiel starten</button>
+      <p class="best" id="best-intro"></p>
+    </div>
+
+    <div class="card" id="card-over" hidden>
+      <p class="eyebrow">Zeit abgelaufen</p>
+      <h2 id="over-title">Runde 7 geschafft</h2>
+      <div class="stats">
+        <div class="stat"><b id="stat-level">7</b><span>Runden</span></div>
+        <div class="stat"><b id="stat-found">28</b><span>Zahlen</span></div>
+        <div class="stat"><b id="stat-mistakes">3</b><span>Fehler</span></div>
+      </div>
+      <button class="action action--lg" id="btn-again" type="button">Nochmal spielen</button>
+      <p class="best" id="best-over"></p>
+    </div>
+
+    <div class="card card--slim" id="card-pause" hidden>
+      <h2>Pause</h2>
+      <p class="lead">Die Uhr steht still.</p>
+      <button class="action action--lg" id="btn-resume" type="button">Weiter</button>
+    </div>
+  </section>
+
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
