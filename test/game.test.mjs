@@ -201,3 +201,17 @@ test('Rundenbonus landet auf der Uhr', () => {
 
   assert.equal(game.remaining(0), 14_000);
 });
+
+test('abgelaufene Zeit nimmt keine Tipps mehr an', () => {
+  const game = new Game({ totalMs: 1000, levelBonusMs: 4000 }, seeded(23));
+  game.start(0);
+  game.hide();
+
+  // Letzter Tipp faellt zwischen zwei Frames, nachdem die Zeit abgelaufen ist.
+  const count = game.board.count;
+  for (let n = 1; n < count; n++) game.tap(cellOf(game, n), 500);
+
+  assert.equal(game.tap(cellOf(game, count), 1200).result, 'ignored');
+  assert.equal(game.remaining(1200), 0, 'der Bonus darf den Durchlauf nicht wiederbeleben');
+  assert.equal(game.checkTime(1200), true);
+});

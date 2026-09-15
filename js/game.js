@@ -65,6 +65,10 @@ export class Game {
   tap(cell, now = 0) {
     const miss = { result: 'ignored', value: 0, levelDone: false };
     if (this.phase !== 'playing' || this.paused || !this.board) return miss;
+    // Zwischen zwei Frames kann die Zeit ablaufen, bevor `checkTime` es merkt.
+    // Ein Tipp danach darf nichts mehr bewirken – sonst weckt der Rundenbonus
+    // einen bereits beendeten Durchlauf wieder auf.
+    if (this.remaining(now) <= 0) return miss;
     if (cell < 0 || cell >= this.board.tiles.length) return miss;
     if (this.revealed.has(cell)) return miss;
 

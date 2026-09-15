@@ -88,14 +88,18 @@ export function evaluate(config, runs = 200) {
   });
 }
 
+/*
+ * Jede Variante nennt Startzeit und Bonus ausdruecklich. Wuerde sie die Werte aus
+ * `config.js` erben, verschoebe sich die Vergleichsbasis still mit, sobald dort
+ * jemand schraubt - und die Zeile "vorher" zeigte plötzlich das "nachher".
+ */
 const VARIANTS = {
-  'aktuell (50s, alle 2 Runden, kein Bonus)': { ...CONFIG },
-  'Bonus 3s': { ...CONFIG, levelBonusMs: 3000 },
-  'Bonus 4s': { ...CONFIG, levelBonusMs: 4000 },
-  '35s + Bonus 4s': { ...CONFIG, totalMs: 35_000, levelBonusMs: 4000 },
-  '30s + Bonus 4s': { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000 },
-  '30s + Bonus 4s, alle 3 Runden': { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, growEvery: 3 },
-  '30s + Bonus 5s': { ...CONFIG, totalMs: 30_000, levelBonusMs: 5000 },
+  'vorher (50 s, kein Bonus)': { ...CONFIG, totalMs: 50_000, levelBonusMs: 0 },
+  'aktuell (30 s, +4 s)': { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000 },
+  '50 s, +3 s': { ...CONFIG, totalMs: 50_000, levelBonusMs: 3000 },
+  '35 s, +4 s': { ...CONFIG, totalMs: 35_000, levelBonusMs: 4000 },
+  '30 s, +5 s': { ...CONFIG, totalMs: 30_000, levelBonusMs: 5000 },
+  '30 s, +4 s, alle 3 Runden': { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, growEvery: 3 },
 };
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -7,8 +7,11 @@
  * auf eine alte `game.js` treffen. Ein Update gibt es, sobald sich `VERSION` ändert.
  */
 
-const VERSION = 'v2';
-const CACHE = `ascending-numbers-${VERSION}`;
+const VERSION = 'v3';
+/* Cache Storage gilt pro Origin, nicht pro Scope: Auf *.github.io teilen sich alle
+   Projekte einen Origin. Deshalb fassen wir nur Caches mit unserem Praefix an. */
+const PREFIX = 'ascending-numbers-';
+const CACHE = `${PREFIX}${VERSION}`;
 
 const ASSETS = [
   '.',
@@ -38,7 +41,8 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
+      .then((keys) => keys.filter((key) => key.startsWith(PREFIX) && key !== CACHE))
+      .then((stale) => Promise.all(stale.map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });

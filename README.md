@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Spiellogik, Balance und Service Worker (node:test, 21 Tests)
+npm test      # Spiellogik, Balance und Service Worker (node:test, 22 Tests)
 ```
 
 ## Spielablauf
