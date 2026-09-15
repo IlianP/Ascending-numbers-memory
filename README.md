@@ -88,7 +88,21 @@ keine gehashten Dateinamen gibt, liegt immer nur *ein* Stand im Cache – eine n
 installiert den neuen Cache und wirft den alten weg. Ohne Bump bleiben Besucher auf
 dem alten Stand. `npm test` prüft immerhin, dass keine Datei in der Liste fehlt.
 
-## Noch offen
+## Deployment
 
-- Deployment auf GitHub Pages.
+`.github/workflows/pages.yml` erledigt beides: Bei jedem Push und bei jedem Pull
+Request laufen die Tests, und was auf `main` landet, veröffentlicht GitHub Pages
+anschließend automatisch – ohne Build, es wird nur kopiert:
+
+<https://ilianp.github.io/Ascending-numbers-memory/>
+
+Ausgeliefert werden nur `index.html`, `manifest.webmanifest`, `sw.js`, `css/`,
+`js/` und `icons/`; Tests und Workflow bleiben draußen. Alle Pfade sind relativ,
+deshalb stört das Unterverzeichnis der Projektseite weder Manifest noch Service
+Worker.
+
+> **Einmalig nötig:** in *Settings → Pages* als Quelle **GitHub Actions** wählen.
+> Ohne das schlägt der Deploy-Schritt fehl, die Tests laufen trotzdem.
+
+## Noch offen
 - Feinschliff am Schwierigkeitsgrad: Tempo der Steigerung, Zeitbonus pro Runde.

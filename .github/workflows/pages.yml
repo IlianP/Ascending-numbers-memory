@@ -1,0 +1,53 @@
+name: Tests und GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Ein laufendes Deployment nicht abwürgen, aber überholte Läufe verwerfen.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Kein npm ci: das Projekt hat bewusst keine Abhängigkeiten.
+      - run: npm test
+
+  deploy:
+    name: Deployment
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+
+      # Nur das ausliefern, was der Browser wirklich braucht – keine Tests, kein Workflow.
+      - name: Seite zusammenstellen
+        run: |
+          mkdir -p _site
+          cp -r index.html manifest.webmanifest sw.js css js icons _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
