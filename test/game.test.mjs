@@ -153,3 +153,29 @@ test('Auswertung zählt nur abgeschlossene Runden', () => {
 
   assert.deepEqual(game.summary(), { levels: 1, found: 4, mistakes: 0 });
 });
+
+test('Direkteinstieg zählt die übersprungenen Runden nicht mit', () => {
+  const game = new Game({}, seeded(23));
+  game.start(0, 15);
+
+  assert.equal(game.level, 15);
+  assert.equal(game.board.cols, 4);
+  assert.deepEqual(game.summary(), { levels: 0, found: 0, mistakes: 0 });
+
+  game.hide();
+  for (let n = 1; n <= game.board.count; n++) game.tap(cellOf(game, n), 0);
+  assert.equal(game.clearedLevels, 1);
+
+  game.nextLevel();
+  assert.equal(game.level, 16);
+  assert.equal(game.clearedLevels, 1);
+});
+
+test('Neustart setzt den Einstiegspunkt zurück', () => {
+  const game = new Game({}, seeded(31));
+  game.start(0, 12);
+  game.start(0);
+
+  assert.equal(game.level, 1);
+  assert.equal(game.clearedLevels, 0);
+});

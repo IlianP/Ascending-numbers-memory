@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Spiellogik (node:test, 13 Tests)
+npm test      # Spiellogik (node:test, 15 Tests)
 ```
 
 ## Spielablauf
@@ -69,6 +69,9 @@ gereicht. Deshalb laufen die Tests ohne Browser und ohne Warten.
 
 `?runde=15` startet direkt im 4×4-Raster, `?zeit=10` kürzt den Durchlauf auf
 10 Sekunden. Beides lässt sich kombinieren: `index.html?runde=15&zeit=10`.
+
+Solche Läufe zählen nur die Runden, die man wirklich gespielt hat – übersprungene
+Runden gehen nicht in die Auswertung ein, und der Rekord bleibt unberührt.
 
 ## Noch offen
 

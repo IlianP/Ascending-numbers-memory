@@ -19,6 +19,7 @@ export class Game {
     /** @type {Phase} */
     this.phase = 'idle';
     this.level = 0;
+    this.startLevel = 1;
     this.board = null;
     this.next = 1;
     this.revealed = new Set();
@@ -35,7 +36,8 @@ export class Game {
   start(now, fromLevel = 1) {
     this.reset();
     this.deadline = now + this.config.totalMs;
-    this.level = Math.max(0, fromLevel - 1);
+    this.startLevel = Math.max(1, Math.trunc(fromLevel) || 1);
+    this.level = this.startLevel - 1;
     this.nextLevel();
     return this.board;
   }
@@ -120,15 +122,18 @@ export class Game {
     return false;
   }
 
-  /** Runden, die komplett geschafft wurden. */
+  /**
+   * Runden, die in *diesem* Durchlauf komplett geschafft wurden.
+   * Beim Direkteinstieg (`fromLevel > 1`) zählen die übersprungenen Runden nicht mit.
+   */
   get clearedLevels() {
     const done = this.board && this.next > this.board.count;
-    return done ? this.level : this.level - 1;
+    return Math.max(0, this.level - this.startLevel + (done ? 1 : 0));
   }
 
   summary() {
     return {
-      levels: Math.max(0, this.clearedLevels),
+      levels: this.clearedLevels,
       found: this.found,
       mistakes: this.mistakes,
     };

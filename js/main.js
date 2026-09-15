@@ -40,6 +40,8 @@ const params = new URLSearchParams(location.search);
 const startLevel = Math.max(1, Math.trunc(Number(params.get('runde'))) || 1);
 const seconds = Number(params.get('zeit'));
 const overrides = seconds > 0 ? { totalMs: seconds * 1000 } : {};
+/** Abgekürzte Läufe sind zum Ausprobieren da und zählen nicht für den Rekord. */
+const debugRun = startLevel > 1 || seconds > 0;
 
 const game = new Game(overrides);
 const view = new BoardView(el.board, el.dots, onTap);
@@ -162,8 +164,10 @@ function gameOver() {
   endRun();
   fx.cue('over');
 
-  if (stats.levels > prefs.bestLevels ||
-     (stats.levels === prefs.bestLevels && stats.found > prefs.bestFound)) {
+  const isRecord = stats.levels > prefs.bestLevels ||
+    (stats.levels === prefs.bestLevels && stats.found > prefs.bestFound);
+
+  if (isRecord && !debugRun) {
     prefs = save({ bestLevels: stats.levels, bestFound: stats.found });
     el.overTitle.textContent = 'Neuer Rekord!';
   } else {
