@@ -348,6 +348,11 @@ button {
   transition: transform .12s cubic-bezier(.2, .7, .3, 1), opacity .2s ease;
 }
 
+/* Unsichtbar, aber im Layout: Verschwaende der Knopf seinen Platz, wuerde das
+   Spielfeld beim Verdecken neu zentriert - genau im Moment, in dem der Spieler
+   sich die Positionen gemerkt hat. */
+.action[data-idle] { visibility: hidden; }
+
 .action:active { transform: scale(.96); }
 .action[disabled] { opacity: .45; pointer-events: none; }
 .action--lg { width: 100%; padding: 16px 28px; font-size: 18px; }
@@ -457,6 +462,35 @@ button {
 
 .stat b { font-size: 24px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .stat span { font-size: 12px; color: var(--muted); }
+
+/* Einstellungen auf den Karten: erreichbar, ohne die Karte zu einem Menue zu machen. */
+.chips {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 650;
+  transition: background .15s ease, color .15s ease, border-color .15s ease, transform .1s ease;
+}
+
+.chip:hover { background: var(--tap); color: var(--fg); }
+.chip:active { transform: scale(.96); }
+.chip svg { width: 18px; height: 18px; }
+.chip[aria-pressed="true"] { color: var(--fg); border-color: var(--fg); }
+.chip[aria-pressed="true"] .icon-mute { display: none; }
+.chip[aria-pressed="false"] .icon-wave { display: none; }
 
 .best {
   margin: 16px 0 0;
