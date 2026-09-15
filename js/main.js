@@ -263,6 +263,13 @@ document.addEventListener('keydown', (event) => {
 
 /* ------------------------------------------------------------------ Start */
 
+/* Offline-Betrieb ist ein Bonus: klappt die Registrierung nicht, läuft das Spiel trotzdem. */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
 applySound();
 bestLine(el.bestIntro);
 showSheet(el.cardIntro);

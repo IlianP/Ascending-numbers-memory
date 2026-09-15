@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Spiellogik (node:test, 15 Tests)
+npm test      # Spiellogik und Service Worker (node:test, 18 Tests)
 ```
 
 ## Spielablauf
@@ -44,6 +44,7 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Wechselt man den Tab, hält die Uhr an, statt den Lauf zu verschenken.
 - Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop.
 - Rekord (Runden + Zahlen) bleibt im `localStorage`.
+- Läuft offline: ein Service Worker legt den kompletten App-Shell in den Cache.
 - Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `Esc` bricht ab.
 - `prefers-reduced-motion` schaltet die Animationen ab.
 
@@ -59,7 +60,9 @@ js/board-view.js      Raster im DOM, Eingaben, Animationen
 js/feedback.js        Töne (Web Audio) und Vibration
 js/storage.js         Rekord und Ton-Einstellung
 js/main.js            verdrahtet alles und hält die Uhr am Laufen
+sw.js                 Service Worker: App-Shell im Cache, damit es offline läuft
 test/game.test.mjs    Tests für Rundenplan, Regeln, Uhr, Pause
+test/sw.test.mjs      prüft, dass der Cache wirklich alle Dateien kennt
 ```
 
 Die Spiellogik kennt weder DOM noch `Date.now()` – die Zeit wird ihr von außen
@@ -73,8 +76,19 @@ gereicht. Deshalb laufen die Tests ohne Browser und ohne Warten.
 Solche Läufe zählen nur die Runden, die man wirklich gespielt hat – übersprungene
 Runden gehen nicht in die Auswertung ein, und der Rekord bleibt unberührt.
 
+## Offline
+
+Beim ersten Besuch wandert der komplette App-Shell in einen versionierten Cache,
+danach startet das Spiel auch ohne Netz (`sw.js`). Weil es keinen Build und damit
+keine gehashten Dateinamen gibt, liegt immer nur *ein* Stand im Cache – eine neue
+`main.js` kann also nie auf eine alte `game.js` treffen.
+
+**Nach jeder Änderung an den ausgelieferten Dateien `VERSION` in `sw.js` hochzählen**
+(`v1` → `v2`). Das ist das Release-Signal: Der Browser erkennt das geänderte Skript,
+installiert den neuen Cache und wirft den alten weg. Ohne Bump bleiben Besucher auf
+dem alten Stand. `npm test` prüft immerhin, dass keine Datei in der Liste fehlt.
+
 ## Noch offen
 
-- Service Worker, damit die App offline läuft (das Manifest liegt schon bereit).
 - Deployment auf GitHub Pages.
 - Feinschliff am Schwierigkeitsgrad: Tempo der Steigerung, Zeitbonus pro Runde.
