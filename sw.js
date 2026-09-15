@@ -7,7 +7,7 @@
  * auf eine alte `game.js` treffen. Ein Update gibt es, sobald sich `VERSION` ändert.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `ascending-numbers-${VERSION}`;
 
 const ASSETS = [

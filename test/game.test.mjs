@@ -179,3 +179,25 @@ test('Neustart setzt den Einstiegspunkt zurück', () => {
   assert.equal(game.level, 1);
   assert.equal(game.clearedLevels, 0);
 });
+
+test('pausiertes Spiel nimmt keine Tipps an', () => {
+  const game = new Game({ totalMs: 10_000, levelBonusMs: 4000 }, seeded(13));
+  game.start(0);
+  game.hide();
+  game.pause(1000);
+
+  assert.equal(game.tap(cellOf(game, 1), 1000).result, 'ignored');
+  assert.equal(game.found, 0);
+
+  game.resume(1000);
+  assert.equal(game.tap(cellOf(game, 1), 1000).result, 'correct');
+});
+
+test('Rundenbonus landet auf der Uhr', () => {
+  const game = new Game({ totalMs: 10_000, levelBonusMs: 4000 }, seeded(19));
+  game.start(0);
+  game.hide();
+  for (let n = 1; n <= game.board.count; n++) game.tap(cellOf(game, n), 0);
+
+  assert.equal(game.remaining(0), 14_000);
+});
