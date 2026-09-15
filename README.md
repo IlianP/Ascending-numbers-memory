@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 28 Tests)
+npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 31 Tests)
 ```
 
 ## Spielablauf
@@ -63,7 +63,8 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Fortschrittspunkte unter dem Raster zeigen, welche Zahl als Nächstes dran ist.
 - Uhr als Ziffern **und** als Balken, unter 10 Sekunden rot.
 - Wechselt man den Tab, hält die Uhr an, statt den Lauf zu verschenken.
-- Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop.
+- Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop – die schmalen
+  Fälle sind als Test festgehalten (320/360/390 px).
 - Rekord (Runden + Zahlen) bleibt im `localStorage`.
 - Läuft offline: ein Service Worker legt den kompletten App-Shell in den Cache.
 - Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `N` startet neu,
@@ -84,6 +85,11 @@ der Bühne zentrierte daraufhin neu und das Spielfeld sprang **26 px nach unten*
 Jetzt wird der Knopf nur unsichtbar geschaltet (`visibility`), behält also seinen
 Platz. `test/layout.test.mjs` misst das im echten Browser nach und schlägt an,
 sobald sich ein Rechteck auch nur um Hundertstel verschiebt.
+
+Dieselbe Datei hält den Kopfbereich im Bild: Bei 320 px ist die Zeile aus Runden-Pille,
+Uhr und drei Knöpfen so voll, dass symmetrische Spalten (`1fr auto 1fr`) nicht mehr
+passen – die linke Spalte wird dann so breit wie die Knopfleiste rechts und schiebt den
+Beenden-Knopf aus dem Bild. Jede Seite nimmt jetzt nur, was sie braucht.
 
 ## Aufbau
 

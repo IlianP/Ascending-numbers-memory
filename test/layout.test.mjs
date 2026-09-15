@@ -107,3 +107,33 @@ test('Uhr und Fortschrittspunkte verschieben nichts', { skip: missing }, async (
     await page.close();
   }
 });
+
+/**
+ * Der Kopfbereich muss auch auf dem schmalsten unterstuetzten Geraet passen.
+ * Anlass: Der dritte Knopf (Neustart) sprengte bei 320 px die Zeile, weil die
+ * Spalten symmetrisch waren (`1fr auto 1fr`) - die linke Spalte wurde so breit
+ * wie die Knopfleiste rechts. Der Beenden-Knopf lag dann ausserhalb des Bildes.
+ */
+for (const width of [320, 360, 390]) {
+  test(`Bedienung passt bei ${width} px ins Bild`, { skip: missing }, async () => {
+    const page = await openGame('/index.html', { width, height: 720 });
+    try {
+      await page.click('#btn-start');
+      await page.wait(400);
+
+      for (const selector of ['#level-pill', '#clock', '#btn-sound', '#btn-restart', '#btn-quit', '#board', '#action']) {
+        const box = await page.rect(selector);
+        assert.ok(box.left >= 0, `${selector} ragt links heraus (${box.left})`);
+        assert.ok(box.left + box.width <= width,
+          `${selector} ragt rechts heraus (bis ${(box.left + box.width).toFixed(1)} bei ${width} px)`);
+        assert.ok(box.width > 0 && box.height > 0, `${selector} ist unsichtbar klein`);
+      }
+
+      assert.equal(await page.evaluate('document.documentElement.scrollWidth'), width,
+        'die Seite darf nicht seitlich scrollen');
+      assert.deepEqual(page.errors, []);
+    } finally {
+      await page.close();
+    }
+  });
+}
