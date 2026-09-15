@@ -14,6 +14,9 @@ const el = {
   flash: $('flash'),
   btnSound: $('btn-sound'),
   btnQuit: $('btn-quit'),
+  btnRestart: $('btn-restart'),
+  chipSoundIntro: $('chip-sound-intro'),
+  chipSoundOver: $('chip-sound-over'),
   bonus: $('bonus'),
   board: $('board'),
   dots: $('dots'),
@@ -108,13 +111,22 @@ function bestLine(target) {
 }
 
 function setAction(label) {
-  el.action.hidden = label === null;
+  // Nur unsichtbar schalten, nicht ausblenden: Der Knopf haelt seinen Platz,
+  // damit das Spielfeld beim Verdecken exakt stehen bleibt.
+  el.action.toggleAttribute('data-idle', label === null);
+  el.action.disabled = label === null;
   if (label !== null) el.action.textContent = label;
 }
 
 /* ----------------------------------------------------------------- Ablauf */
 
 function startRun() {
+  // Ein laufender Durchlauf wird ersetzt, nicht verdoppelt: sonst liefen nach
+  // einem Neustart zwei Schleifen und ein alter Rundentimer ins neue Spiel.
+  cancelAnimationFrame(raf);
+  raf = 0;
+  view.clearTimers();
+
   fx.unlock();
   hideSheet();
   el.hud.dataset.on = '1';
@@ -217,6 +229,7 @@ el.btnStart.addEventListener('click', startRun);
 el.btnAgain.addEventListener('click', startRun);
 el.action.addEventListener('click', hideNumbers);
 el.btnQuit.addEventListener('click', quit);
+el.btnRestart.addEventListener('click', startRun);
 
 el.btnResume.addEventListener('click', () => {
   if (game.resume(now())) {
@@ -226,16 +239,27 @@ el.btnResume.addEventListener('click', () => {
   }
 });
 
-el.btnSound.addEventListener('click', () => {
+/* Der Ton laesst sich an drei Stellen schalten - alle zeigen denselben Zustand. */
+const soundControls = [el.btnSound, el.chipSoundIntro, el.chipSoundOver];
+
+for (const control of soundControls) {
+  control.addEventListener('click', toggleSound);
+}
+
+function toggleSound() {
   prefs = save({ sound: !prefs.sound });
   applySound();
   fx.unlock();
-  fx.play('correct');
-});
+  fx.play('correct'); // beim Ausschalten still - genau das ist die Rueckmeldung
+}
 
 function applySound() {
   fx.setEnabled(prefs.sound);
-  el.btnSound.setAttribute('aria-pressed', String(prefs.sound));
+  for (const control of soundControls) {
+    control.setAttribute('aria-pressed', String(prefs.sound));
+    const label = control.querySelector('.chip__label');
+    if (label) label.textContent = prefs.sound ? 'Ton an' : 'Ton aus';
+  }
 }
 
 /* Tab im Hintergrund: Uhr anhalten statt den Lauf zu verschenken. */
@@ -264,6 +288,13 @@ document.addEventListener('keydown', (event) => {
 
   if (event.key === 'Escape' && game.running) {
     quit();
+    return;
+  }
+
+  // Neues Spiel, ohne das Ende abzuwarten.
+  if (event.key === 'n' || event.key === 'N') {
+    event.preventDefault();
+    startRun();
     return;
   }
 

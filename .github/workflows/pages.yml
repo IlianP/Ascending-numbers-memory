@@ -20,6 +20,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      # Die Layout-Tests fahren einen echten Browser. Auf den GitHub-Runnern ist
+      # Chrome vorinstalliert; fehlt er, soll das auffallen statt still zu überspringen.
+      - name: Browser suchen
+        run: |
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
+          echo "gefunden: $chrome"
+          echo "CHROME_PATH=$chrome" >> "$GITHUB_ENV"
+
       # Kein npm ci: das Projekt hat bewusst keine Abhängigkeiten.
       - run: npm test
 

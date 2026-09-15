@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Spiellogik, Balance und Service Worker (node:test, 22 Tests)
+npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 31 Tests)
 ```
 
 ## Spielablauf
@@ -63,11 +63,33 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Fortschrittspunkte unter dem Raster zeigen, welche Zahl als Nächstes dran ist.
 - Uhr als Ziffern **und** als Balken, unter 10 Sekunden rot.
 - Wechselt man den Tab, hält die Uhr an, statt den Lauf zu verschenken.
-- Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop.
+- Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop – die schmalen
+  Fälle sind als Test festgehalten (320/360/390 px).
 - Rekord (Runden + Zahlen) bleibt im `localStorage`.
 - Läuft offline: ein Service Worker legt den kompletten App-Shell in den Cache.
-- Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `Esc` bricht ab.
+- Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `N` startet neu,
+  `Esc` bricht ab.
+- Ton lässt sich auf der Startkarte umschalten, nicht erst im laufenden Spiel.
+- Neues Spiel jederzeit per Knopf im Kopfbereich – ohne das Ende der Uhr abzuwarten.
+- Das Spielfeld bleibt beim Verdecken exakt stehen (siehe unten).
 - `prefers-reduced-motion` schaltet die Animationen ab.
+
+## Das Spielfeld darf nicht wackeln
+
+Wer sich die Zahlen gemerkt hat, tippt blind. Bewegt sich das Raster in dem
+Moment, in dem verdeckt wird, muss der Spieler seinen Finger neu ausrichten – und
+verliert genau den Vorsprung, den er sich gerade erarbeitet hat.
+
+Der „Verdecken“-Knopf verschwand früher per `hidden` aus dem Layout. Das Raster
+der Bühne zentrierte daraufhin neu und das Spielfeld sprang **26 px nach unten**.
+Jetzt wird der Knopf nur unsichtbar geschaltet (`visibility`), behält also seinen
+Platz. `test/layout.test.mjs` misst das im echten Browser nach und schlägt an,
+sobald sich ein Rechteck auch nur um Hundertstel verschiebt.
+
+Dieselbe Datei hält den Kopfbereich im Bild: Bei 320 px ist die Zeile aus Runden-Pille,
+Uhr und drei Knöpfen so voll, dass symmetrische Spalten (`1fr auto 1fr`) nicht mehr
+passen – die linke Spalte wird dann so breit wie die Knopfleiste rechts und schiebt den
+Beenden-Knopf aus dem Bild. Jede Seite nimmt jetzt nur, was sie braucht.
 
 ## Aufbau
 
@@ -86,7 +108,23 @@ tools/balance.mjs     Simulation für die Balance (kein Teil der Web-App)
 test/game.test.mjs    Tests für Rundenplan, Regeln, Uhr, Pause
 test/balance.test.mjs hält die Balance grob an Ort und Stelle
 test/sw.test.mjs      prüft, dass der Cache wirklich alle Dateien kennt
+test/layout.test.mjs  misst im Browser, dass das Spielfeld still steht
+test/controls.test.mjs Ton-Schalter und Neustart im Browser
+test/helpers/browser.mjs  Browser-Treiber über das DevTools-Protokoll
 ```
+
+### Tests im Browser, ohne Abhängigkeiten
+
+Layout lässt sich nicht in Node prüfen – dafür braucht es eine echte
+Rendering-Engine. Statt Playwright ins Projekt zu holen (und damit `npm install`),
+steuert `test/helpers/browser.mjs` ein vorhandenes Chrome direkt über das
+DevTools-Protokoll: Node 22 bringt `WebSocket` mit, Chrome bringt das Protokoll
+mit, dazwischen liegen rund 200 Zeilen. Gesucht wird der Browser über
+`CHROME_PATH` und die üblichen Pfade.
+
+Ohne Browser überspringen sich diese Tests mit Hinweis. Damit das in CI nicht
+unbemerkt passiert, sucht der Workflow Chrome in einem eigenen Schritt und
+scheitert, wenn keiner da ist.
 
 Die Spiellogik kennt weder DOM noch `Date.now()` – die Zeit wird ihr von außen
 gereicht. Deshalb laufen die Tests ohne Browser und ohne Warten.
