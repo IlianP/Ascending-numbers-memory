@@ -57,7 +57,7 @@ export const I18N_EN = {
   // textContent, never innerHTML.
   'intro.rule.time': '<b>30&nbsp;seconds</b> on the clock to start',
   'intro.rule.bonus': 'Every round you finish adds up to <b>4&nbsp;seconds</b>',
-  'intro.rule.penalty': 'From the <b>third mistake</b> of a round that bonus shrinks',
+  'intro.rule.penalty': 'One mistake <b>per number</b> is free &ndash; guessing costs the bonus',
   'intro.rule.grow': 'Every second round adds <b>one more number</b>',
   'intro.rule.clock': 'The clock never runs backwards &ndash; so take your time',
   'intro.start': 'Start game',

@@ -19,25 +19,33 @@ export const CONFIG = {
   levelBonusMs: 4000,
   /** So lange bleibt eine falsch getippte Kachel markiert. */
   wrongRevealMs: 380,
-  /** So viele Fehler pro Runde kosten nichts. */
-  bonusFreeMistakes: 2,
   /**
-   * Jeder weitere Fehler dieser Runde nimmt so viel vom Rundenbonus weg, bis
-   * auf 0 herunter. Das ist der Schutz gegen wildes Durchprobieren: Wer sich
-   * durch eine Runde tippt, statt sie sich zu merken, verdient keine Zeit mehr,
-   * und ohne neue Zeit ist nach der Startzeit Schluss. Die Uhr geht dabei nie
+   * So viele Fehler sind pro Runde frei – JE ZAHL der Runde, nicht pauschal.
+   * Eine Runde mit zehn Zahlen laedt zu mehr Vertippern ein als eine mit drei;
+   * eine feste Grenze traf deshalb genau die spaeten, schweren Runden.
+   */
+  bonusFreeMistakesPerNumber: 1,
+  /**
+   * Jeder Fehler darueber hinaus nimmt so viel vom Rundenbonus weg, bis auf 0
+   * herunter. Das ist der Schutz gegen wildes Durchprobieren: Wer sich durch
+   * eine Runde tippt, statt sie sich zu merken, verdient keine Zeit mehr, und
+   * ohne neue Zeit ist nach der Startzeit Schluss. Die Uhr geht dabei nie
    * rueckwaerts – sie waechst nur langsamer.
    *
-   * Warum so grosszuegig (zwei Fehler frei, dann gleich 2 s)? Weil der
-   * Abtipper in `tools/balance.mjs` ueber alle Strafhoehen hinweg dieselben
-   * Werte liefert: Er macht pro Runde so viele Fehler, dass der Bonus bei
-   * JEDER Strafe auf 0 faellt. Haertere Werte treffen also nur noch die
-   * ehrlichen Spieler. Gemessen (Zahlen, Mittel aus 200 Laeufen):
+   * Warum so grosszuegig? Weil Grosszuegigkeit hier NICHTS kostet. Der Abtipper
+   * in `tools/balance.mjs` macht pro Zahl ein halbes Brett an Fehlversuchen,
+   * liegt also bei jeder denkbaren Grenze darueber – seine Werte sind ueber die
+   * ganze Spanne dieselben. Die Grenze trifft praktisch nur ehrliche Spieler.
+   * Gemessen (gefundene Zahlen, 300 Laeufe, Spielerprofil an einem echten Lauf
+   * geeicht: 17 Runden / 123 Zahlen / 60 Fehler):
    *
-   *            schnell  mittel  langsam | Abtipper 4/s  8/s  12/s
-   *   ohne       227.5   124.5     66.4 |    79.4  168.4  293.1
-   *   frei 1/-1s 222.1   119.2     62.5 |    24.5   49.5   73.9
-   *   frei 2/-2s 226.6   123.1     64.9 |    24.4   49.4   73.7   <- hier
+   *   Freigrenze          Mensch  Abtipper 12/s
+   *   keine Regel          341,7          293,2
+   *   2 pauschal           132,6           73,8
+   *   4 pauschal           188,1           75,5
+   *   halbe Rundengroesse  209,6           74,0
+   *   eine je Zahl         321,3           76,8   <- hier
+   *   anderthalb je Zahl       –           88,2   (ab hier faengt es an zu lecken)
    */
   bonusPenaltyMs: 2000,
   /** Pause zwischen geschaffter Runde und nächster Vorschau. */

@@ -19,11 +19,31 @@
 import { Game } from '../js/game.js';
 import { CONFIG } from '../js/config.js';
 
-/** Spielertypen als Tempo-Faktor auf die Zeiten unten. */
+/**
+ * Spielertypen als Tempo-Faktor auf die Zeiten unten. `errorRate` ist der
+ * ERWARTUNGSWERT der Fehltipps je Zahl, nicht die Wahrscheinlichkeit fuer genau
+ * einen – wer eine Zahl vergessen hat, tippt mehrfach daneben.
+ *
+ * Dass das Modell frueher nur einen Fehltipp je Zahl zuliess, war keine
+ * Kleinigkeit: Damit kann ein Spieler die Freigrenze des Rundenbonus (ein
+ * Fehler je Zahl) gar nicht reissen, und die Simulation meldete fuer jede
+ * Grenze "kostet nichts". Der erste echte Lauf sah anders aus – 17 Runden,
+ * 123 Zahlen, 60 Fehler, also 0,49 Fehler je Zahl.
+ *
+ * `gemessen` ist an genau diesem Lauf geeicht, und zwar unter der Regel, die
+ * damals galt (pauschal zwei Fehler frei): Ein Raster ueber Tempo x Fehlerrate
+ * trifft mit ~130 ms je Tipp und 0,35 die 17 Runden und 123 Zahlen fast genau.
+ * Die 60 Fehler untertreibt es auf 44 – mehr Fehler bekommt das Modell bei
+ * diesem Tempo nicht unter, ohne die Rundenzahl zu verfehlen.
+ *
+ * EIN einzelner Lauf ist duenn. Das Profil ist ein Anhaltspunkt, keine
+ * Wahrheit, und gehoert nachgezogen, sobald mehr echte Laeufe vorliegen.
+ */
 const PLAYERS = [
   { name: 'schnell', factor: 0.75, errorRate: 0.04 },
   { name: 'mittel', factor: 1, errorRate: 0.08 },
   { name: 'langsam', factor: 1.35, errorRate: 0.14 },
+  { name: 'gemessen', factor: 0.4, errorRate: 0.35 },
 ];
 
 /** Tempi des Abtippers, in Tipps pro Sekunde. 4/s tippt jeder, 12/s sind zwei Daumen im Akkord. */
@@ -33,6 +53,19 @@ const BRUTE_RATES = [4, 8, 12];
 const memoriseMs = (count, factor) => (600 + 280 * count) * factor;
 /** Ein Tipp: Zielen und Antippen. */
 const tapMs = (factor) => 330 * factor;
+
+/**
+ * Wie oft daneben, bevor die richtige Zahl sitzt? Geometrisch verteilt mit
+ * Erwartungswert `rate` – meistens null, gelegentlich mehrfach. Genau diese
+ * Haeufung entscheidet ueber den Rundenbonus, und ein Modell mit hoechstens
+ * einem Fehltipp je Zahl kann sie nicht zeigen.
+ */
+function missesBeforeHit(rate, rng) {
+  const p = rate / (1 + rate);
+  let n = 0;
+  while (rng() < p && n < 12) n += 1;
+  return n;
+}
 
 function seeded(seed) {
   let s = seed;
@@ -60,8 +93,8 @@ function playRun(config, player, seed) {
     game.hide();
 
     for (let n = 1; n <= count; n++) {
-      // Fehltipp: kostet einen Tipp Zeit, der Zug wird danach wiederholt.
-      if (rng() < player.errorRate) {
+      // Fehltipps: kosten je einen Tipp Zeit, der Zug wird danach wiederholt.
+      for (let miss = missesBeforeHit(player.errorRate, rng); miss > 0; miss--) {
         now += tapMs(player.factor);
         const wrong = game.board.tiles.findIndex((v, i) => v !== n && !game.revealed.has(i));
         if (wrong >= 0) game.tap(wrong, now);
@@ -81,7 +114,7 @@ function playRun(config, player, seed) {
   }
 
   const summary = game.summary();
-  return { levels: summary.levels, found: summary.found, seconds: now / 1000, cols };
+  return { levels: summary.levels, found: summary.found, mistakes: summary.mistakes, seconds: now / 1000, cols };
 }
 
 /** Ein Durchlauf des Abtippers: kein Einprägen, nur Durchprobieren. */
@@ -125,7 +158,7 @@ function playBrute(config, tapsPerSecond, seed) {
   }
 
   const summary = game.summary();
-  return { levels: summary.levels, found: summary.found, seconds: now / 1000, cols };
+  return { levels: summary.levels, found: summary.found, mistakes: summary.mistakes, seconds: now / 1000, cols };
 }
 
 const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -134,6 +167,7 @@ const summarise = (name, results) => ({
   player: name,
   levels: +mean(results.map((r) => r.levels)).toFixed(1),
   found: +mean(results.map((r) => r.found)).toFixed(1),
+  mistakes: +mean(results.map((r) => r.mistakes)).toFixed(1),
   seconds: +mean(results.map((r) => r.seconds)).toFixed(1),
   maxGrid: Math.max(...results.map((r) => r.cols)),
 });
@@ -161,8 +195,10 @@ const VARIANTS = {
   'vorher (50 s, kein Bonus)': { ...CONFIG, totalMs: 50_000, levelBonusMs: 0 },
   'ohne Schutz (30 s, +4 s, Fehler kostenlos)':
     { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusPenaltyMs: 0 },
-  'aktuell (30 s, +4 s, ab dem 3. Fehler -2 s)':
-    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusFreeMistakes: 2, bonusPenaltyMs: 2000 },
+  'aktuell (30 s, +4 s, ein Fehler je Zahl frei)':
+    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusFreeMistakesPerNumber: 1, bonusPenaltyMs: 2000 },
+  'strenger (pauschal 2 Fehler frei)':
+    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusFreeMistakesPerNumber: 0, bonusPenaltyMs: 2000 },
   '50 s, +3 s': { ...CONFIG, totalMs: 50_000, levelBonusMs: 3000 },
   '35 s, +4 s': { ...CONFIG, totalMs: 35_000, levelBonusMs: 4000 },
   '30 s, +5 s': { ...CONFIG, totalMs: 30_000, levelBonusMs: 5000 },
@@ -173,7 +209,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   for (const [label, config] of Object.entries(VARIANTS)) {
     console.log(`\n${label}`);
     for (const row of evaluate(config)) {
-      console.log(`  ${row.player.padEnd(14)} ${String(row.levels).padStart(5)} Runden  ${String(row.found).padStart(6)} Zahlen  ${String(row.seconds).padStart(5)}s  bis ${row.maxGrid}x${row.maxGrid}`);
+      console.log(`  ${row.player.padEnd(14)} ${String(row.levels).padStart(5)} Runden  ${String(row.found).padStart(6)} Zahlen  ${String(row.mistakes).padStart(6)} Fehler  ${String(row.seconds).padStart(5)}s  bis ${row.maxGrid}x${row.maxGrid}`);
     }
   }
 }
