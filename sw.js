@@ -7,7 +7,7 @@
  * auf eine alte `game.js` treffen. Ein Update gibt es, sobald sich `VERSION` ändert.
  */
 
-const VERSION = 'v7';
+const VERSION = 'v8';
 /* Cache Storage gilt pro Origin, nicht pro Scope: Auf *.github.io teilen sich alle
    Projekte einen Origin. Deshalb fassen wir nur Caches mit unserem Praefix an. */
 const PREFIX = 'ascending-numbers-';

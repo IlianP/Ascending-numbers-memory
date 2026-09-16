@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 80 Tests)
+npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 82 Tests)
 ```
 
 ## Spielablauf
@@ -351,8 +351,18 @@ mit 404. Das Spiel fällt dann still auf die Liste im Gerät zurück; der Reiter
 `test/sql/rank-order.sql` prüft, was nur die Datenbank beantworten kann: dass der
 gemeldete Rang exakt die Listenposition ist (auch bei Gleichstand), dass
 dieselbe Kennung keine zweite Zeile anlegt und dass unmögliche Werte abgelehnt
-werden. Es läuft **gegen eine Wegwerf-Datenbank, nie gegen das Live-Projekt** –
-es leert die Tabelle am Anfang. Die nötigen Befehle stehen im Kopf der Datei.
+werden. `test/sql/client-key.sql` prüft das Rate-Limit. Beide laufen **gegen eine
+Wegwerf-Datenbank, nie gegen das Live-Projekt** – sie leeren die Tabelle. Die
+nötigen Befehle stehen im Kopf von `rank-order.sql`.
+
+Das Rate-Limit hatte nämlich genau den Fehler, gegen den es schützen sollte: Der
+Schlüssel kam aus `inet_client_addr()`, und das ist über die REST-Schnittstelle
+die Adresse von PostgREST – für alle dieselbe. „20 Einträge pro Minute und
+Client" hieß in Wirklichkeit „20 pro Minute für alle zusammen", und wer sie
+ausschöpfte, sperrte die übrigen aus. Jetzt kommt die Adresse aus den
+Kopfzeilen der Anfrage (`cf-connecting-ip`, sonst `x-forwarded-for`), und der
+Test spielt mit `set_config('request.headers', …)` nach, was PostgREST im
+Betrieb setzt.
 
 ## Aufbau
 
@@ -385,6 +395,7 @@ test/i18n.test.mjs    die Sprachpakete gegeneinander: Schlüssel, Form, Paramete
 test/language.test.mjs  erkennen, umschalten, merken – im echten Browser
 test/build-artifact.test.mjs  laesst den Buendel-Bau in CI laufen
 test/sql/rank-order.sql  die Serverhälfte gegen eine Wegwerf-Datenbank (siehe unten)
+test/sql/client-key.sql  dass das Rate-Limit Browser trennt statt alle zu treffen
 test/helpers/browser.mjs  Browser-Treiber über das DevTools-Protokoll
 docs/leaderboard-setup.sql  einmalig im Supabase-Projekt auszuführen
 ```

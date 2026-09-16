@@ -12,7 +12,9 @@ import {
 import { levelSpec } from '../js/level.js';
 import { CONFIG } from '../js/config.js';
 
-/** Node hat kein localStorage – ein Attrappe reicht, das Modul kennt nur get/set. */
+const STORE_KEY = 'ascending-numbers/scores/v1';
+
+/** Node hat kein localStorage – eine Attrappe reicht, das Modul kennt nur get/set. */
 function fakeStorage() {
   const store = new Map();
   globalThis.localStorage = {
@@ -20,6 +22,11 @@ function fakeStorage() {
     setItem: (k, v) => store.set(k, String(v)),
     removeItem: (k) => store.delete(k),
   };
+  // Die Notfall-Liste im Arbeitsspeicher ist Modulzustand und ueberlebt einen
+  // Test. Ein gelungener Schreibvorgang loescht sie - genau so bekommt der
+  // naechste Test eine saubere Welt, ohne dass das Modul eine Testluke braucht.
+  saveLocalScore({ name: 'reset', levels: 1, found: 1, mistakes: 0 });
+  store.delete(STORE_KEY);
   return store;
 }
 
@@ -78,7 +85,7 @@ test('previewRank zaehlt Bessere, nicht Gleiche daneben', () => {
 
 test('kaputte Eintraege fliegen beim Lesen raus, statt das Spiel zu stoppen', () => {
   const store = fakeStorage();
-  store.set('ascending-numbers/scores/v1', JSON.stringify([
+  store.set(STORE_KEY, JSON.stringify([
     { name: 'ok', levels: 2, found: 9, mistakes: 0, date: '2026-01-01T00:00:00.000Z' },
     { name: 'ohne Zahlen' },
     'Text statt Objekt',
@@ -87,16 +94,34 @@ test('kaputte Eintraege fliegen beim Lesen raus, statt das Spiel zu stoppen', ()
   ]));
   assert.deepEqual(loadLocalScores().map((e) => e.name), ['ok']);
 
-  store.set('ascending-numbers/scores/v1', '{kein JSON');
+  store.set(STORE_KEY, '{kein JSON');
   assert.deepEqual(loadLocalScores(), []);
 });
 
-test('ein voller Speicher kostet den Eintrag, nicht den Lauf', () => {
+test('ein voller Speicher kostet den Eintrag nicht - die Sitzung haelt ihn', () => {
   fakeStorage();
+  saveLocalScore(run(40, { name: 'Alt' }));           // geht noch in den Speicher
   globalThis.localStorage.setItem = () => { throw new Error('QuotaExceeded'); };
-  const { list, rank } = saveLocalScore(run(12));
-  assert.equal(rank, 0, 'der Platz wird trotzdem gemeldet');
-  assert.equal(list.length, 1);
+
+  const { list, rank } = saveLocalScore(run(12, { name: 'Neu' }));
+  assert.equal(rank, 1, 'der Platz wird gemeldet');
+  assert.equal(list.length, 2);
+
+  // Der Punkt: Beim naechsten Lesen muss der Eintrag noch da sein. Vorher
+  // meldete die Funktion einen Platz, den es gleich darauf nicht mehr gab -
+  // die Oberflaeche sagte "gespeichert" und markierte eine fremde Zeile.
+  assert.deepEqual(loadLocalScores().map((e) => e.name), ['Alt', 'Neu']);
+  assert.equal(previewRank(20), 1, 'auch die Vorschau rechnet mit der Sitzungsliste');
+
+  // Und ein weiterer Eintrag baut darauf auf, statt den vorigen zu verlieren.
+  saveLocalScore(run(99, { name: 'Neuer' }));
+  assert.deepEqual(loadLocalScores().map((e) => e.name), ['Neuer', 'Alt', 'Neu']);
+});
+
+test('die Sitzungsliste eines Vortests faerbt nicht auf den naechsten ab', () => {
+  // Laeuft direkt nach dem Test mit dem vollen Speicher. Traege `fakeStorage`
+  // die Notfall-Liste nicht ab, stuenden hier noch dessen Eintraege.
+  assert.deepEqual(loadLocalScores(), []);
 });
 
 test('Namen werden gesaeubert, ein leerer bleibt leer', () => {
