@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 77 Tests)
+npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 80 Tests)
 ```
 
 ## Spielablauf
@@ -372,6 +372,7 @@ js/i18n/*.js          die Sprachpakete: en (Grundlage), de, fr, es
 js/main.js            verdrahtet alles und hält die Uhr am Laufen
 sw.js                 Service Worker: App-Shell im Cache, damit es offline läuft
 tools/balance.mjs     Simulation für die Balance (kein Teil der Web-App)
+tools/build-artifact.mjs  packt den Stand in eine Datei – zum Ausprobieren auf dem Telefon
 test/game.test.mjs    Tests für Rundenplan, Regeln, Uhr, Pause
 test/balance.test.mjs hält die Balance fest – und dass Abtippen kein Merken schlägt
 test/sw.test.mjs      prüft, dass der Cache wirklich alle Dateien kennt
@@ -382,6 +383,7 @@ test/leaderboard.test.mjs  die Netzschicht gegen einen gefälschten `fetch`
 test/leaderboard-ui.test.mjs  die Bestenliste im Browser, inklusive 320-px-Maßen je Sprache
 test/i18n.test.mjs    die Sprachpakete gegeneinander: Schlüssel, Form, Parameter, Leichen
 test/language.test.mjs  erkennen, umschalten, merken – im echten Browser
+test/build-artifact.test.mjs  laesst den Buendel-Bau in CI laufen
 test/sql/rank-order.sql  die Serverhälfte gegen eine Wegwerf-Datenbank (siehe unten)
 test/helpers/browser.mjs  Browser-Treiber über das DevTools-Protokoll
 docs/leaderboard-setup.sql  einmalig im Supabase-Projekt auszuführen
@@ -402,6 +404,32 @@ scheitert, wenn keiner da ist.
 
 Die Spiellogik kennt weder DOM noch `Date.now()` – die Zeit wird ihr von außen
 gereicht. Deshalb laufen die Tests ohne Browser und ohne Warten.
+
+## Auf dem Telefon ausprobieren
+
+Das Spiel wird mit dem Daumen gespielt, und der Sprachwähler ist auf dem Handy
+ein Rad statt eines Klappmenüs – beides sieht man auf keinem
+Entwicklungsrechner. `tools/build-artifact.mjs` packt den aktuellen Stand
+deshalb in **eine** eigenständige HTML-Datei, die sich irgendwo hochladen und
+auf dem Telefon öffnen lässt:
+
+```bash
+node tools/build-artifact.mjs            # -> ascending-numbers.html
+```
+
+Es ist ausdrücklich kein Ersatz für die echte Seite: Der Service Worker fehlt
+(also der Offline-Betrieb), und die globale Bestenliste ist tot, weil eine
+solche Seite unter ihrer Sicherheitsrichtlinie nichts nachladen darf – sie fällt
+still auf die Liste im Gerät zurück, genau wie ohne Netz. Ausgeliefert wird
+weiterhin nur, was in `.github/workflows/pages.yml` steht; `tools/` ist nicht
+dabei.
+
+Der Bau besteht aus Annahmen über die Quellen – Reihenfolge der Module (die
+Sprachpakete **vor** `js/i18n.js`, sonst liegt `I18N_PACKS` in der temporalen
+Todeszone), keine doppelten Namen auf oberster Ebene, die i18n-Haken im Markup.
+Jede davon ist ein `throw`, und `test/build-artifact.test.mjs` lässt den Bau in
+CI laufen: Ein Werkzeug, das man alle paar Wochen einmal braucht, ist sonst
+genau dann kaputt, wenn man es braucht.
 
 ## Zum Ausprobieren
 
