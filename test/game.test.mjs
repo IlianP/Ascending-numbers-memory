@@ -218,6 +218,28 @@ test('Rundenbonus schrumpft mit den Fehlern, aber nie unter null', () => {
   assert.equal(game.levelBonus(4, 9), levelBonusMs, '9 Zahlen: vier Fehler sind frei');
 });
 
+test('pauschale und mitwachsende Freigrenze sind zweierlei', () => {
+  // Diese Unterscheidung ist nicht akademisch: Eine Vergleichsvariante in
+  // tools/balance.mjs bildete die frueher ausgelieferte Regel ("zwei Fehler
+  // frei") mit `bonusFreeMistakesPerNumber: 0` nach. Das sind aber NULL freie
+  // Fehler - der Vergleichswert war zu streng und die daraus abgeleitete
+  // Begruendung fuer die neue Grenze wertlos.
+  const pauschal = new Game({ bonusFreeMistakes: 2, bonusFreeMistakesPerNumber: 0 });
+  const voll = pauschal.config.levelBonusMs;
+  const strafe = pauschal.config.bonusPenaltyMs;
+
+  assert.equal(pauschal.levelBonus(2, 5), voll, 'zwei Fehler sind frei');
+  assert.equal(pauschal.levelBonus(3, 5), voll - strafe, 'der dritte kostet');
+  assert.equal(pauschal.levelBonus(2, 12), voll, 'und zwar unabhaengig von der Rundengroesse');
+
+  const keine = new Game({ bonusFreeMistakes: 0, bonusFreeMistakesPerNumber: 0 });
+  assert.equal(keine.levelBonus(1, 5), voll - strafe, 'ohne Freigrenze kostet schon der erste');
+
+  const mitwachsend = new Game({ bonusFreeMistakes: 0, bonusFreeMistakesPerNumber: 1 });
+  assert.equal(mitwachsend.levelBonus(5, 5), voll);
+  assert.equal(mitwachsend.levelBonus(5, 3), voll - 2 * strafe, 'kleine Runde, engere Grenze');
+});
+
 test('wildes Durchprobieren verdient keine Zeit', () => {
   // Der Schutz gegen das Abtippen: Wer eine Runde durchprobiert, schliesst sie
   // zwar ab, bekommt dafuer aber nichts - und ohne neue Zeit ist der Durchlauf

@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 82 Tests)
+npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 83 Tests)
 ```
 
 ## Spielablauf
@@ -163,30 +163,44 @@ schwersten sind.
 
 `tools/balance.mjs` zieht die Fehltipps je Zahl jetzt geometrisch (Erwartungswert
 `errorRate`) und kennt ein viertes Profil `gemessen`, geeicht an jenem Lauf unter
-der damals geltenden Regel. Damit lässt sich die Freigrenze endlich messen statt
-schätzen (gefundene Zahlen, Mittel aus 200 Läufen):
+der damals geltenden Regel (~165 ms je Tipp, 0,5 Fehler je Zahl → 18,2 Runden /
+132,2 Zahlen / 66 Fehler gegen die gemessenen 17 / 123 / 60). Damit lässt sich
+die Freigrenze messen statt schätzen (gefundene Zahlen, Mittel aus 200 Läufen):
 
-| Freigrenze | `gemessen` | Abtipper 12/s |
-| --- | --- | --- |
-| gar keine Regel | 599,7 | 293,1 |
-| pauschal 2 frei | 120,9 | 73,3 |
-| **ein Fehler je Zahl** | **592,1** | **76,4** |
-| anderthalb je Zahl | – | 88,2 |
+| Freigrenze | `gemessen` | Abtipper 8/s | Abtipper 12/s |
+| --- | --- | --- | --- |
+| gar keine Regel | 341,8 | 168,4 | 293,1 |
+| pauschal 2 frei (vorher) | 132,2 | 49,4 | 73,7 |
+| pauschal 4 frei | 186,9 | 50,6 | 75,3 |
+| halbe Rundengröße | 196,4 | 49,5 | 73,8 |
+| **einer je Zahl** | **321,1** | **51,1** | **76,4** |
+| anderthalb je Zahl | 338,0 | 57,0 | 86,8 |
+| zwei je Zahl | 341,0 | 73,3 | 106,2 |
 
-Die entscheidende Spalte ist die rechte: **Der Abtipper ist gegen die Strafhöhe
-praktisch unempfindlich.** Er macht pro Zahl ein halbes Brett an Fehlversuchen
-und liegt damit über *jeder* denkbaren Grenze – ob zwei Fehler frei sind oder
-einer je Zahl, ändert für ihn drei Zahlen. Die Grenze trifft also fast
-ausschließlich ehrliche Spieler. Daraus folgt die Regel für dieses Stellrad:
-**so großzügig wie möglich, solange die Strafe überhaupt existiert.** Pauschal
-zwei Fehler kosteten den gemessenen Spieler 80 % seines Ergebnisses und brachten
-gegenüber der großzügigen Variante nichts; ab anderthalb Fehlern je Zahl fängt
-es umgekehrt an zu lecken.
+Die Tabelle zeigt einen klaren Knick. Bis „einer je Zahl" bleibt der Abtipper
+vollständig ausgebremst (76,4 gegen 73,7 bei der strengsten Variante) – die
+Großzügigkeit kostet also **nichts** an Schutz, holt dem ehrlichen Spieler aber
+94 % seines Ergebnisses zurück. Ab anderthalb Fehlern je Zahl klettert der
+Abtipper (86,8), bei zweien ist die Bremse praktisch weg (106,2), während der
+ehrliche Spieler nichts mehr dazugewinnt. Genau an diesem Knick liegt die Regel.
 
-Ein einzelner echter Lauf ist eine dünne Grundlage – die Richtung ist trotzdem
-belastbar, weil sie nicht daran hängt, wie gut das Spielerprofil getroffen ist,
-sondern an der Unempfindlichkeit des Abtippers. Das Profil gehört nachgezogen,
-sobald mehr Läufe vorliegen.
+Dahinter steckt ein allgemeineres Muster: Der Abtipper macht pro Zahl ein halbes
+Brett an Fehlversuchen und liegt damit über fast jeder denkbaren Grenze. Sie
+trifft deshalb vor allem ehrliche Spieler – und die richtige Einstellung ist
+**so großzügig wie möglich, solange die Strafe überhaupt greift**.
+
+Ein einzelner echter Lauf ist eine dünne Grundlage; das Profil gehört
+nachgezogen, sobald mehr Läufe vorliegen. Die Richtung hängt aber nicht daran,
+wie gut es getroffen ist, sondern am flachen Verlauf der rechten Spalten.
+
+**Eine Warnung aus eigener Erfahrung:** Die pauschale Grenze
+(`bonusFreeMistakes`) und die mitwachsende (`bonusFreeMistakesPerNumber`) sind
+zweierlei, und wer eine Vergleichsvariante mit `bonusFreeMistakesPerNumber: 0`
+baut, modelliert **null** freie Fehler statt zwei. Eine erste Fassung dieser
+Tabelle lief genau in diese Falle: Der Vergleichswert war zu streng, das daran
+geeichte Spielerprofil zu gut, und die abgeleitete Aussage („kostet 80 %")
+falsch – richtig sind 61 %. `test/game.test.mjs` hält die beiden Grenzen
+seitdem auseinander.
 
 Was bleibt: Wer 30 Sekunden lang zwölf Mal pro Sekunde tippt, landet bei ~76
 Zahlen. Dafür steht dann „rund 200 Fehler" in der Zeile. Ganz ausschließen lässt

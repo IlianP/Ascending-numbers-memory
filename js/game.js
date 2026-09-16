@@ -56,8 +56,8 @@ export class Game {
   /**
    * Der Bonus, den die laufende Runde noch einbringt.
    *
-   * Frei ist ein Fehltipp je Zahl der Runde – also mehr in den grossen Runden,
-   * die mehr zu merken geben. Jeder Fehler darueber hinaus knabbert am Bonus,
+   * Frei sind `bonusFreeMistakes` Fehler plus einer je Zahl der Runde – also
+   * mehr in den grossen Runden, die mehr zu merken geben. Jeder Fehler darueber hinaus knabbert am Bonus,
    * bis nichts mehr uebrig ist. Das ist der Schutz gegen wildes
    * Durchprobieren: Wer sich durch eine Runde tippt, statt sie sich zu merken,
    * bekommt keine Zeit dafuer – und ohne neue Zeit ist der Durchlauf nach der
@@ -68,7 +68,7 @@ export class Game {
    * nicht gestartet) ist die Grenze 0.
    */
   levelBonus(mistakes = this.levelMistakes, count = this.board ? this.board.count : 0) {
-    const frei = count * this.config.bonusFreeMistakesPerNumber;
+    const frei = this.config.bonusFreeMistakes + count * this.config.bonusFreeMistakesPerNumber;
     const over = Math.max(0, mistakes - frei);
     return Math.max(0, this.config.levelBonusMs - this.config.bonusPenaltyMs * over);
   }

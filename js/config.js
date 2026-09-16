@@ -20,9 +20,18 @@ export const CONFIG = {
   /** So lange bleibt eine falsch getippte Kachel markiert. */
   wrongRevealMs: 380,
   /**
-   * So viele Fehler sind pro Runde frei – JE ZAHL der Runde, nicht pauschal.
-   * Eine Runde mit zehn Zahlen laedt zu mehr Vertippern ein als eine mit drei;
-   * eine feste Grenze traf deshalb genau die spaeten, schweren Runden.
+   * Pauschal freie Fehler pro Runde, unabhaengig von ihrer Groesse. Steht auf 0,
+   * weil die Freigrenze mitwachsen soll (siehe unten) – der Wert bleibt, damit
+   * sich die frueher ausgelieferte Regel in `tools/balance.mjs` noch als
+   * Vergleichsvariante rechnen laesst. Eine Vergleichszahl, die die alte Regel
+   * nur ungefaehr trifft, taugt nicht als Begruendung fuer die neue.
+   */
+  bonusFreeMistakes: 0,
+  /**
+   * Dazu so viele freie Fehler JE ZAHL der Runde. Das ist die eigentliche
+   * Grenze: Eine Runde mit zehn Zahlen laedt zu mehr Vertippern ein als eine
+   * mit drei, und eine feste Grenze traf deshalb genau die spaeten, schweren
+   * Runden.
    */
   bonusFreeMistakesPerNumber: 1,
   /**

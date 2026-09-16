@@ -31,10 +31,16 @@ import { CONFIG } from '../js/config.js';
  * 123 Zahlen, 60 Fehler, also 0,49 Fehler je Zahl.
  *
  * `gemessen` ist an genau diesem Lauf geeicht, und zwar unter der Regel, die
- * damals galt (pauschal zwei Fehler frei): Ein Raster ueber Tempo x Fehlerrate
- * trifft mit ~130 ms je Tipp und 0,35 die 17 Runden und 123 Zahlen fast genau.
- * Die 60 Fehler untertreibt es auf 44 – mehr Fehler bekommt das Modell bei
- * diesem Tempo nicht unter, ohne die Rundenzahl zu verfehlen.
+ * damals wirklich galt: pauschal zwei Fehler frei (`bonusFreeMistakes: 2`,
+ * `bonusFreeMistakesPerNumber: 0`). Das ist keine Formalie – eine erste
+ * Eichung lief versehentlich gegen NULL freie Fehler und damit gegen eine zu
+ * strenge Regel; das Profil fiel entsprechend zu gut aus und die daraus
+ * abgeleiteten Zahlen waren wertlos.
+ *
+ * Ein Raster ueber Tempo x Fehlerrate trifft mit ~165 ms je Tipp und 0,5
+ * Fehlern je Zahl alle drei Kennzahlen: 18,2 Runden / 132,6 Zahlen / 65,9
+ * Fehler gegen die gemessenen 17 / 123 / 60. Gewaehlt wurde bewusst das
+ * Profil, das die FEHLERZAHL trifft – an ihr haengt die Freigrenze.
  *
  * EIN einzelner Lauf ist duenn. Das Profil ist ein Anhaltspunkt, keine
  * Wahrheit, und gehoert nachgezogen, sobald mehr echte Laeufe vorliegen.
@@ -43,7 +49,7 @@ const PLAYERS = [
   { name: 'schnell', factor: 0.75, errorRate: 0.04 },
   { name: 'mittel', factor: 1, errorRate: 0.08 },
   { name: 'langsam', factor: 1.35, errorRate: 0.14 },
-  { name: 'gemessen', factor: 0.4, errorRate: 0.35 },
+  { name: 'gemessen', factor: 0.5, errorRate: 0.5 },
 ];
 
 /** Tempi des Abtippers, in Tipps pro Sekunde. 4/s tippt jeder, 12/s sind zwei Daumen im Akkord. */
@@ -196,9 +202,17 @@ const VARIANTS = {
   'ohne Schutz (30 s, +4 s, Fehler kostenlos)':
     { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusPenaltyMs: 0 },
   'aktuell (30 s, +4 s, ein Fehler je Zahl frei)':
-    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusFreeMistakesPerNumber: 1, bonusPenaltyMs: 2000 },
-  'strenger (pauschal 2 Fehler frei)':
-    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000, bonusFreeMistakesPerNumber: 0, bonusPenaltyMs: 2000 },
+    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000,
+      bonusFreeMistakes: 0, bonusFreeMistakesPerNumber: 1, bonusPenaltyMs: 2000 },
+  // Die zuvor ausgelieferte Regel, ausdruecklich als pauschale Grenze. Sie hier
+  // mit `bonusFreeMistakesPerNumber: 0` nachzubilden waere falsch: Das sind
+  // NULL freie Fehler, nicht zwei - und damit ein zu strenger Vergleichswert.
+  'vorher (pauschal 2 Fehler frei)':
+    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000,
+      bonusFreeMistakes: 2, bonusFreeMistakesPerNumber: 0, bonusPenaltyMs: 2000 },
+  'zum Vergleich: gar kein Fehler frei':
+    { ...CONFIG, totalMs: 30_000, levelBonusMs: 4000,
+      bonusFreeMistakes: 0, bonusFreeMistakesPerNumber: 0, bonusPenaltyMs: 2000 },
   '50 s, +3 s': { ...CONFIG, totalMs: 50_000, levelBonusMs: 3000 },
   '35 s, +4 s': { ...CONFIG, totalMs: 35_000, levelBonusMs: 4000 },
   '30 s, +5 s': { ...CONFIG, totalMs: 30_000, levelBonusMs: 5000 },
