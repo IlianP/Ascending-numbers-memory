@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 62 Tests)
+npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 77 Tests)
 ```
 
 ## Spielablauf
@@ -76,6 +76,8 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Tastatur: Ziffernblock-Layout auf das 3×3-Raster, `Leertaste` verdeckt, `N` startet neu,
   `Esc` bricht ab.
 - Ton lässt sich auf der Startkarte umschalten, nicht erst im laufenden Spiel.
+- Vier Sprachen (Deutsch, Englisch, Französisch, Spanisch); die Browsersprache
+  wird erkannt, umstellen geht auf der Start- und der Endkarte (siehe unten).
 - Neues Spiel jederzeit per Knopf im Kopfbereich – ohne das Ende der Uhr abzuwarten.
 - Das Spielfeld bleibt beim Verdecken exakt stehen (siehe unten).
 - `prefers-reduced-motion` schaltet die Animationen ab.
@@ -157,6 +159,100 @@ Zahlen – unter dem mittleren Spieler, aber über dem langsamen. Dafür steht d
 ehrliches Spiel zu bestrafen; `test/balance.test.mjs` hält fest, dass der
 Abtipper unter dem mittleren Spieler bleibt und sein Lauf keine 30 Sekunden
 übersteht.
+
+## Sprachen
+
+Die Oberfläche spricht **Deutsch, Englisch, Französisch und Spanisch**. Welche
+Sprache gilt, entscheidet in dieser Reihenfolge:
+
+1. was im Sprachfeld ausdrücklich gewählt wurde,
+2. sonst die erste Browsersprache, für die es ein Paket gibt (`de-AT` → `de`),
+3. sonst **Englisch**.
+
+Punkt 3 ist Absicht und nicht Deutsch, obwohl das Spiel auf Deutsch entstanden
+ist: Wer eine Sprache mitbringt, die es hier nicht gibt, bekommt die mit der
+größten Reichweite. Aus demselben Grund liefert `index.html` den englischen Text
+roh aus – er ist die Grundlage, an der alle Pakete gemessen werden.
+
+### Umgestellt wird über ein Auswahlfeld, nicht über Flaggen
+
+Der Chip mit dem Globus auf der Start- und der Endkarte ist ein echtes
+`<select>` in Chip-Form. Das hat zwei Gründe. Erstens malt das Betriebssystem
+die Liste selbst – auf dem Handy als Rad, auf dem Rechner als Menü –, es gibt
+also kein nachgebautes Aufklappmenü, nichts an der Tastaturbedienung
+nachzurüsten und nichts, was bei einer fünften Sprache neu geschrieben werden
+müsste. Zweitens sind **Flaggen keine Sprachen**: Eine Flagge ist ein Land, und
+schon beim Spanischen wäre die Frage, welches. Die Sprachen stehen deshalb unter
+ihrem eigenen Namen da (*Deutsch*, *English*, *Français*, *Español*) und werden
+nie übersetzt – wer gerade die falsche Sprache vor sich hat, muss seine eigene
+trotzdem lesen können.
+
+Der Wechsel wirkt **sofort, ohne die Seite neu zu laden**. Das Feld steht nur auf
+der Start- und der Endkarte, dort läuft also keine Uhr; die einzigen
+vergänglichen Anzeigen sind die Endkarte und die Bestenliste, und die werden neu
+gemalt. Ein Neuladen würde stattdessen genau das kosten, was gerade auf der
+Endkarte steht: den noch nicht eingetragenen Lauf.
+
+### Wie ein Sprachpaket aussieht
+
+`js/i18n.js` ist reine Logik (`t()`, `resolveLanguage()`, die Paketliste) und
+kennt kein DOM – genauso geschichtet wie `js/scores.js` und `js/leaderboard.js`.
+Die Pakete in `js/i18n/` sind flache Zuordnungen `Schlüssel → Text`, wobei ein
+Wert auch eine **Funktion** sein darf:
+
+```js
+'hud.level':  ({ n }) => `Runde ${n}`,
+'over.done':  ({ levels }) => `${dePlural(levels, 'Runde', 'Runden')} geschafft`,
+```
+
+Zusammengesetzte Sätze sind bewusst Funktionen und keine `%s`-Vorlagen:
+Wortstellung und Kongruenz unterscheiden sich, und Plural ist nicht überall
+dieselbe Regel – Französisch lässt die 0 im Singular („0 erreur"), Deutsch nicht.
+Jedes Paket bringt deshalb seine eigene Plural-Hilfe mit; eine gemeinsame
+Plural-Maschine gibt es nicht und sollte es nicht geben. Reine Gebietsschema-Daten
+– Datumsformat, Monatsnamen – kommen aus `Intl`, nicht aus der Übersetzung.
+
+### Was nicht übersetzt wird
+
+- **Der Name des Spiels.** „Ascending Numbers" steht so im Fenstertitel, im
+  Manifest und auf dem Startbildschirm.
+- **`manifest.webmanifest`.** Ein Manifest kann der Sprache der Oberfläche nicht
+  folgen; Name und Beschreibung stehen deshalb auf Englisch, passend zur
+  Grundlage in `index.html`.
+- **Kommentare, SQL und dieses README.** Das ist Text für die Entwicklung, nicht
+  für die spielende Person.
+
+### Eine Sprache hinzufügen
+
+1. `js/i18n/en.js` kopieren und übersetzen,
+2. in `I18N_PACKS` **und** `I18N_LANGUAGES` (in `js/i18n.js`) eintragen,
+3. die neue Datei in die `ASSETS`-Liste von `sw.js` aufnehmen und dort `VERSION`
+   hochzählen,
+4. das Kürzel in `test/language.test.mjs` und in der Sprachschleife von
+   `test/leaderboard-ui.test.mjs` ergänzen,
+5. `npm test` laufen lassen.
+
+`test/i18n.test.mjs` prüft dabei alles, was sich mechanisch prüfen lässt:
+gleiche Schlüsselmengen, gleiche Wertform (String hier, Funktion dort), dass
+jede Vorlage läuft und keinen Parameter fallen lässt – und umgekehrt, dass kein
+Schlüssel ungenutzt herumsteht. Die letzte Prüfung kommt ohne Pflegeliste aus:
+Sie vergleicht, welche Zeichenketten in `js/` einem bekannten Schlüssel
+*gleichen*, statt zu raten, was nach einem Schlüssel aussieht.
+
+### Achtung: Länge
+
+Französisch und Spanisch laufen 15 bis 30 Prozent länger als Englisch, und die
+engste Zeile der App ist die Reiterzeile der Bestenliste – zwei Reiter
+nebeneinander auf 320 px, beide ohne Umbruch. Genau dort stand „Auf dem Gerät"
+19 px zu weit und wurde abgeschnitten, ohne dass irgendetwas überlief: Ein
+abgeschnittener Reiter sieht immer noch aus wie ein Reiter. Deshalb misst
+`test/leaderboard-ui.test.mjs` jetzt **jeden Reiter einzeln, in jeder Sprache**,
+und die Chipreihe darf umbrechen, statt Text zu quetschen.
+
+Wer Text prüft, muss außerdem die Sprache festnageln: `openGame(pfad, viewport,
+'fr-FR')`. Ohne das dritte Argument spräche die Seite die Sprache des Rechners,
+auf dem der Test gerade läuft – voreingestellt ist `de-DE`, weil die älteren
+Tests deutsche Texte erwarten.
 
 ## Bestenliste
 
@@ -271,6 +367,8 @@ js/feedback.js        Töne (Web Audio) und Vibration
 js/storage.js         Rekord und Ton-Einstellung
 js/scores.js          Wertung eines Laufs und die Bestenliste auf dem Gerät (reine Logik)
 js/leaderboard.js     globale Bestenliste über Supabase – die einzige Datei mit Netzzugriff
+js/i18n.js            Übersetzungsschicht: t(), Sprachauflösung, Paketliste (reine Logik)
+js/i18n/*.js          die Sprachpakete: en (Grundlage), de, fr, es
 js/main.js            verdrahtet alles und hält die Uhr am Laufen
 sw.js                 Service Worker: App-Shell im Cache, damit es offline läuft
 tools/balance.mjs     Simulation für die Balance (kein Teil der Web-App)
@@ -281,7 +379,9 @@ test/layout.test.mjs  misst im Browser, dass das Spielfeld still steht und die K
 test/controls.test.mjs Ton-Schalter, Neustart und der verschwiegene Fehltipp im Browser
 test/scores.test.mjs  Wertung, Reihenfolge, Gleichstand, kaputte Daten
 test/leaderboard.test.mjs  die Netzschicht gegen einen gefälschten `fetch`
-test/leaderboard-ui.test.mjs  die Bestenliste im Browser, inklusive 320-px-Maßen
+test/leaderboard-ui.test.mjs  die Bestenliste im Browser, inklusive 320-px-Maßen je Sprache
+test/i18n.test.mjs    die Sprachpakete gegeneinander: Schlüssel, Form, Parameter, Leichen
+test/language.test.mjs  erkennen, umschalten, merken – im echten Browser
 test/sql/rank-order.sql  die Serverhälfte gegen eine Wegwerf-Datenbank (siehe unten)
 test/helpers/browser.mjs  Browser-Treiber über das DevTools-Protokoll
 docs/leaderboard-setup.sql  einmalig im Supabase-Projekt auszuführen

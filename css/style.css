@@ -80,6 +80,18 @@ button {
   white-space: nowrap;
 }
 
+/* Bis js/main.js uebersetzt hat, bleibt die App unsichtbar (das Attribut setzt
+   applyTranslations). Nur so sieht eine franzoesische Oberflaeche nicht ein
+   Einzelbild lang die englische Grundlage aus index.html. Ohne JS gaebe es
+   ohnehin kein Spielfeld - das Warten kostet also nichts. */
+.app {
+  visibility: hidden;
+}
+
+html[data-i18n-ready] .app {
+  visibility: visible;
+}
+
 .app {
   position: relative;
   display: grid;
@@ -494,6 +506,10 @@ button {
 /* Einstellungen auf den Karten: erreichbar, ohne die Karte zu einem Menue zu machen. */
 .chips {
   display: flex;
+  /* Umbrechen, nicht quetschen: Drei Chips passen auf 390 px nebeneinander,
+     auf 320 px nicht mehr - und ein laengeres Wort ("Clasificación") reisst
+     die Reihe auch auf breiteren Geraeten auf. */
+  flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
   margin-top: 14px;
@@ -519,6 +535,52 @@ button {
 .chip[aria-pressed="true"] { color: var(--fg); border-color: var(--fg); }
 .chip[aria-pressed="true"] .icon-mute { display: none; }
 .chip[aria-pressed="false"] .icon-wave { display: none; }
+
+/* Der Sprachwaehler ist ein echtes <select> in Chip-Form. Das System malt die
+   Liste selbst - auf dem Handy als Rad, auf dem Desktop als Menue -, also gibt
+   es hier kein nachgebautes Aufklappmenue, keine Tastaturbedienung zum
+   Nachruesten und nichts, was bei einer fuenften Sprache neu geschrieben werden
+   muesste. Das <label> traegt den Rahmen, das <select> sitzt nur darin. */
+.chip--lang {
+  padding-inline-end: 10px;
+  cursor: pointer;
+}
+
+.chip--lang:focus-within { color: var(--fg); border-color: var(--fg); }
+
+.chip__select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  /* Der Pfeil gehoert zum Chip, nicht zum Systemfeld: `appearance: none` nimmt
+     ihn weg, hier kommt er als Hintergrundbild zurueck - in `currentColor`, also
+     auch im Dunkelmodus richtig. */
+  padding-inline-end: 16px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 6px center, right 2px center;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.chip__select:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; }
+
+/* Die Liste selbst malt das System - dort schlaegt `transparent` als
+   Hintergrund auf manchen Plattformen auf weissem Grund weisse Schrift. */
+.chip__select option { color: initial; background: initial; }
+
+/* Auf den schmalsten verbreiteten Geraeten wird die Chipreihe knapp: drei Chips,
+   und Franzoesisch wie Spanisch laufen deutlich laenger als Deutsch. Gekuerzt
+   wird nur waagerecht - senkrecht ist das die Grosse des Daumenziels. */
+@media (max-width: 360px) {
+  .chip { padding-inline: 10px; gap: 6px; }
+  .chips { gap: 6px; }
+}
 
 .best {
   margin: 16px 0 0;
@@ -631,6 +693,17 @@ button {
   background: var(--face-bg);
   color: var(--fg);
   box-shadow: var(--shadow);
+}
+
+/* Die Reiterzeile ist die engste Zeile der App: zwei Reiter nebeneinander,
+   beide ohne Umbruch, in vier verschieden langen Sprachen. Auf 320 px stand
+   "Auf dem Gerät" darueber hinaus und wurde abgeschnitten - was von selbst
+   nirgends auffaellt, weil ein abgeschnittener Reiter immer noch wie ein
+   Reiter aussieht. Gekuerzt wird nur waagerecht; senkrecht ist das das Ziel
+   fuer den Daumen. Muss HINTER `.tab` stehen: dessen `padding`-Kurzform
+   ueberschriebe ein vorher notiertes `padding-inline` wieder. */
+@media (max-width: 360px) {
+  .tab { padding-inline: 2px; font-size: 13px; }
 }
 
 /* Die Liste ist der einzige Teil, der schrumpfen darf - so bleibt die Karte

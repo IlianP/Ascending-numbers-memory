@@ -13,9 +13,18 @@ function precachedAssets() {
   return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
-/** Alle Dateien, die im Browser wirklich geladen werden. */
+/**
+ * Alle Dateien, die im Browser wirklich geladen werden.
+ *
+ * Absteigend, nicht nur die oberste Ebene: Seit den Sprachpaketen liegt unter
+ * `js/` ein Ordner. Waere die Suche flach geblieben, haette sie `js/i18n` als
+ * fehlende Datei gemeldet und `js/i18n/fr.js` ueberhaupt nie gesehen - also
+ * genau die Datei, deren Fehlen im Cache eine franzoesische Oberflaeche
+ * offline leer laesst.
+ */
 function shippedFiles() {
-  const inDir = (dir) => readdirSync(new URL(dir, `file://${root}`)).map((name) => `${dir}${name}`);
+  const inDir = (dir) => readdirSync(new URL(dir, `file://${root}`), { withFileTypes: true })
+    .flatMap((entry) => (entry.isDirectory() ? inDir(`${dir}${entry.name}/`) : [`${dir}${entry.name}`]));
   return ['index.html', 'manifest.webmanifest', ...inDir('css/'), ...inDir('js/'), ...inDir('icons/')];
 }
 
