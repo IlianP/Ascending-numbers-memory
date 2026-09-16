@@ -7,6 +7,9 @@ import {
   MODE, MAX_LOCAL_ENTRIES, loadLocalScores, saveLocalScore, previewRank, sanitizeName, matchOwnEntry,
 } from './scores.js';
 import { leaderboardConfigured, newSubmissionId, submitScore, fetchTopScores } from './leaderboard.js';
+import {
+  t, setLanguage, resolveLanguage, browserLanguages, I18N_LANGUAGES,
+} from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -21,6 +24,8 @@ const el = {
   btnRestart: $('btn-restart'),
   chipSoundIntro: $('chip-sound-intro'),
   chipSoundOver: $('chip-sound-over'),
+  langIntro: $('lang-intro'),
+  langOver: $('lang-over'),
   bonus: $('bonus'),
   board: $('board'),
   dots: $('dots'),
@@ -66,6 +71,11 @@ const debugRun = startLevel > 1 || seconds > 0;
 const game = new Game(overrides);
 const view = new BoardView(el.board, el.dots, onTap);
 let prefs = load();
+
+/* Die Sprache steht fest, bevor irgendetwas gemalt wird: Eine ausdrueckliche
+   Wahl gewinnt, sonst entscheidet der Browser, sonst Englisch. Alles Weitere
+   laeuft ueber `t()` - siehe js/i18n.js. */
+setLanguage(resolveLanguage(prefs.language, browserLanguages()));
 let raf = 0;
 let flashTimer = 0;
 
@@ -91,7 +101,7 @@ function paintClock() {
 
 /** Gewonnene Sekunden kurz neben der Uhr zeigen - auch, wenn es keine waren. */
 function showBonus(ms) {
-  el.bonus.textContent = `+${Math.round(ms / 1000)} s`;
+  el.bonus.textContent = t('hud.bonus', { seconds: Math.round(ms / 1000) });
   // Ein geschmaelerter Bonus soll sich nicht wie ein Gewinn anfuehlen.
   el.bonus.toggleAttribute('data-cut', ms < CONFIG.levelBonusMs);
   el.bonus.removeAttribute('data-on');
@@ -120,20 +130,33 @@ function hideSheet() {
   sheetTimer = setTimeout(() => { el.sheet.hidden = true; }, 250);
 }
 
-const rounds = (n) => `${n} ${n === 1 ? 'Runde' : 'Runden'}`;
-
+/* `innerHTML` ist hier vertretbar, weil der Wert aus dem eigenen Sprachpaket
+   kommt und nur <b> enthaelt. Fremder Text - Namen aus der globalen Liste -
+   geht ausschliesslich ueber `textContent` hinein. */
 function bestLine(target) {
   target.innerHTML = prefs.bestLevels
-    ? `Rekord: <b>${rounds(prefs.bestLevels)}</b> &middot; <b>${prefs.bestFound} Zahlen</b>`
-    : 'Noch kein Rekord &ndash; auf geht&rsquo;s.';
+    ? t('best.line', { levels: prefs.bestLevels, found: prefs.bestFound })
+    : t('best.none');
 }
 
-function setAction(label) {
+/**
+ * Der Knopf unter dem Raster. Gemerkt wird der SCHLUESSEL, nicht der fertige
+ * Text: Beim Sprachwechsel wird daraus wieder uebersetzt, ohne dass jemand
+ * wissen muss, in welchem Zustand das Spiel gerade steckt.
+ */
+let actionKey = null;
+
+function setAction(key) {
+  actionKey = key;
   // Nur unsichtbar schalten, nicht ausblenden: Der Knopf haelt seinen Platz,
   // damit das Spielfeld beim Verdecken exakt stehen bleibt.
-  el.action.toggleAttribute('data-idle', label === null);
-  el.action.disabled = label === null;
-  if (label !== null) el.action.textContent = label;
+  el.action.toggleAttribute('data-idle', key === null);
+  el.action.disabled = key === null;
+  if (key !== null) el.action.textContent = t(key);
+}
+
+function paintLevel() {
+  el.levelPill.textContent = t('hud.level', { n: game.level });
 }
 
 /* ----------------------------------------------------------------- Ablauf */
@@ -152,8 +175,8 @@ function startRun() {
   el.hud.dataset.on = '1';
   el.hud.setAttribute('aria-hidden', 'false');
   view.render(game.start(now(), startLevel));
-  el.levelPill.textContent = `Runde ${game.level}`;
-  setAction('Verdecken');
+  paintLevel();
+  setAction('action.hide');
   paintClock();
   loop();
 }
@@ -166,8 +189,8 @@ function hideNumbers() {
 
 function nextLevel() {
   view.render(game.nextLevel());
-  el.levelPill.textContent = `Runde ${game.level}`;
-  setAction('Verdecken');
+  paintLevel();
+  setAction('action.hide');
 }
 
 function onTap(cell) {
@@ -210,6 +233,19 @@ function endRun() {
   setAction(null);
 }
 
+/**
+ * Woraus die Endkarte gemalt ist - als Schluessel und Werte, nicht als fertiger
+ * Text. Ein Sprachwechsel malt sie damit neu, statt eine deutsche Ueberschrift
+ * ueber spanischen Zahlen stehen zu lassen.
+ */
+let overTitle = null;
+let lastStats = null;
+
+function paintOverTitle() {
+  if (!overTitle) return;
+  el.overTitle.textContent = t(overTitle.key, overTitle.params);
+}
+
 function gameOver() {
   const stats = game.summary();
   endRun();
@@ -220,12 +256,13 @@ function gameOver() {
 
   if (isRecord && !debugRun) {
     prefs = save({ bestLevels: stats.levels, bestFound: stats.found });
-    el.overTitle.textContent = 'Neuer Rekord!';
+    overTitle = { key: 'over.record' };
   } else {
-    el.overTitle.textContent = stats.levels
-      ? `${rounds(stats.levels)} geschafft`
-      : 'Keine Runde geschafft';
+    overTitle = stats.levels
+      ? { key: 'over.done', params: { levels: stats.levels } }
+      : { key: 'over.none' };
   }
+  paintOverTitle();
 
   el.statLevel.textContent = stats.levels;
   el.statFound.textContent = stats.found;
@@ -250,6 +287,7 @@ function gameOver() {
       }
     : null;
   globalEntries = null; // mit diesem Lauf ist die zuletzt geholte Liste veraltet
+  lastStats = stats;
   prepareEntry(stats);
   showSheet(el.cardOver);
 }
@@ -284,20 +322,37 @@ let submitInFlight = false;
 /** Karte, zu der der "Zurueck"-Knopf der Bestenliste fuehrt. */
 let scoresReturn = null;
 
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+/**
+ * Die Statuszeile unter dem Eintragen-Feld. Gemerkt wird der Schluessel samt
+ * Werten, damit ein Sprachwechsel sie neu uebersetzen kann.
+ *
+ * `params` darf eine Funktion sein. Das braucht genau ein Fall: die Absage des
+ * Servers, deren Grund selbst uebersetzt ist. Als fertiger String eingebacken
+ * stuende nach einem Sprachwechsel ein deutscher Halbsatz in einem spanischen
+ * Satz; als Funktion wird er beim Malen neu geholt.
+ */
+let entryStatus = null;
 
-function setEntryStatus(text, tone = '') {
-  el.entryStatus.textContent = text;
-  if (tone) el.entryStatus.dataset.tone = tone;
+function setEntryStatus(key, params = null, tone = '') {
+  entryStatus = key ? { key, params, tone } : null;
+  paintEntryStatus();
+}
+
+function paintEntryStatus() {
+  const state = entryStatus;
+  el.entryStatus.textContent = state
+    ? t(state.key, typeof state.params === 'function' ? state.params() : state.params)
+    : '';
+  if (state && state.tone) el.entryStatus.dataset.tone = state.tone;
   else el.entryStatus.removeAttribute('data-tone');
 }
 
 /** Eine Notiz statt einer Liste – "wird geladen", "noch leer", "nicht erreichbar". */
-function scoreNote(text) {
+function scoreNote(key) {
   el.scoreList.textContent = '';
   const note = document.createElement('div');
   note.className = 'score-note';
-  note.textContent = text;
+  note.textContent = t(key);
   el.scoreList.appendChild(note);
 }
 
@@ -309,7 +364,7 @@ function scoreNote(text) {
  */
 function renderScoreRows(entries, highlight = -1) {
   if (!entries || entries.length === 0) {
-    scoreNote('Noch nichts eingetragen.');
+    scoreNote('scores.empty');
     return;
   }
 
@@ -317,12 +372,12 @@ function renderScoreRows(entries, highlight = -1) {
   entries.forEach((e, i) => {
     const row = document.createElement('div');
     row.className = 'score-row' + (i === highlight ? ' me' : '');
-    row.title = [
-      plural(e.levels, 'Runde', 'Runden'),
-      plural(e.found, 'Zahl', 'Zahlen'),
-      plural(e.mistakes, 'Fehler', 'Fehler'),
-      entryDate(e),
-    ].filter(Boolean).join(' · ');
+    row.title = t('scores.row.title', {
+      levels: e.levels,
+      found: e.found,
+      mistakes: e.mistakes,
+      date: entryDate(e),
+    });
 
     const rank = document.createElement('span');
     rank.className = 'score-rank';
@@ -330,14 +385,15 @@ function renderScoreRows(entries, highlight = -1) {
 
     const name = document.createElement('span');
     name.className = 'score-name';
-    name.textContent = e.name || 'Ohne Namen';
+    name.textContent = e.name || t('scores.anon');
 
     const val = document.createElement('span');
     val.className = 'score-val';
     const found = document.createElement('b');
     found.textContent = String(e.found);
-    // "R." statt "Runden": Die Zeile muss samt 20-Zeichen-Namen auf 320 px passen.
-    val.append(found, `\u00a0${e.found === 1 ? 'Zahl' : 'Zahlen'} · ${e.levels}\u00a0R.`);
+    // Fett bleibt nur die Zahl; alles dahinter kommt aus dem Sprachpaket
+    // (`scores.row.value`), samt der Abkuerzung, die die Zeile auf 320 px haelt.
+    val.append(found, t('scores.row.value', { found: e.found, levels: e.levels }));
 
     row.append(rank, name, val);
     el.scoreList.appendChild(row);
@@ -350,7 +406,9 @@ function renderScoreRows(entries, highlight = -1) {
 function entryDate(e) {
   const at = typeof e.date === 'string' ? Date.parse(e.date) : e.at;
   if (!Number.isFinite(at)) return '';
-  return new Date(at).toLocaleDateString('de-DE', { day: 'numeric', month: 'short', year: 'numeric' });
+  // Das Format ist Sache der Sprache, nicht der Uebersetzung: Monatsname,
+  // Reihenfolge und Trennzeichen kommen aus `Intl` im jeweiligen Paket.
+  return t('scores.date', { at });
 }
 
 /**
@@ -420,7 +478,7 @@ async function renderGlobal() {
   if (globalLoading) return;
 
   globalLoading = true;
-  scoreNote('Wird geladen …');
+  scoreNote('scores.loading');
   const data = await fetchTopScores(MODE);
   globalLoading = false;
   globalEntries = data;
@@ -429,7 +487,7 @@ async function renderGlobal() {
   if (!data) {
     // Fehlschlagen ist hier ein vorgesehener Zustand, kein Ausnahmefall:
     // ohne Netz (oder vor dem Einrichten des Servers) spielt es sich genauso.
-    scoreNote('Die globale Liste ist gerade nicht erreichbar. Auf dem Gerät ist alles gespeichert.');
+    scoreNote('scores.offline');
     return;
   }
   renderScoreRows(data, ownGlobalRow(data));
@@ -508,27 +566,32 @@ function flushPending() {
  * vorueber; abgelehnte Werte bleiben abgelehnt.
  */
 const REJECTIONS = {
-  'rate limited': { text: 'Gerade zu viele Einträge. In einer Minute klappt es wieder.', retry: true },
-  'bad counters': { text: 'Der Server hält diese Werte für unmöglich.', retry: false },
-  'bad mode': { text: 'Diese Wertung kennt der Server nicht.', retry: false },
-  'missing submission id': { text: 'Dem Eintrag fehlt seine Kennung.', retry: false },
+  'rate limited': { key: 'reject.rateLimited', retry: true },
+  'bad counters': { key: 'reject.badCounters', retry: false },
+  'bad mode': { key: 'reject.badMode', retry: false },
+  'missing submission id': { key: 'reject.missingId', retry: false },
 };
 
+/**
+ * Der Grund bleibt ein SCHLUESSEL, kein Satz: Uebersetzt wird erst beim Malen,
+ * damit ein Sprachwechsel auch die Absage mitnimmt. Die Grundworte des Servers
+ * ("rate limited") sind Kennungen, keine Anzeige - sie werden nie uebersetzt,
+ * nur nachgeschlagen.
+ */
 function rejectionCopy(reason) {
   const known = reason && REJECTIONS[String(reason).trim().toLowerCase()];
   if (known) return known;
-  return {
-    text: reason ? `Der Server hat abgelehnt: „${reason}“.` : 'Der Server hat den Eintrag abgelehnt.',
-    retry: false,
-  };
+  return reason
+    ? { key: 'reject.other', params: { reason }, retry: false }
+    : { key: 'reject.generic', retry: false };
 }
 
 /** Endkarte: Platzvorschau und Eintragen-Zeile fuer diesen Lauf herrichten. */
 function prepareEntry(stats) {
   el.entryName.value = prefs.name || '';
   el.entrySubmit.disabled = false;
-  el.entrySubmit.textContent = 'Eintragen';
-  setEntryStatus('');
+  setSubmitLabel('entry.submit');
+  setEntryStatus(null);
 
   if (!pending) {
     el.rankLine.hidden = true;
@@ -537,17 +600,36 @@ function prepareEntry(stats) {
     // fuer den naechsten, echten Lauf schon gemerkt.
     el.entry.hidden = stats.found === 0;
     el.entrySubmit.disabled = true;
-    if (stats.found > 0) setEntryStatus('Übungslauf (?zeit / ?runde) – zählt nicht für die Bestenliste.');
+    if (stats.found > 0) setEntryStatus('entry.status.practice');
     return;
   }
 
   el.entry.hidden = false;
   el.rankLine.hidden = false;
+  paintRankLine();
+}
+
+/** Die Platzvorschau - eigene Funktion, damit ein Sprachwechsel sie neu malt. */
+function paintRankLine() {
+  if (!pending || el.rankLine.hidden) return;
   const list = loadLocalScores();
   const rank = previewRank(pending.found, list);
   el.rankLine.textContent = rank >= MAX_LOCAL_ENTRIES
-    ? `Reicht diesmal nicht in die besten ${MAX_LOCAL_ENTRIES} auf diesem Gerät.`
-    : `Platz ${rank + 1} von ${Math.min(list.length + 1, MAX_LOCAL_ENTRIES)} auf diesem Gerät.`;
+    ? t('entry.rank.miss', { max: MAX_LOCAL_ENTRIES })
+    : t('entry.rank', { rank: rank + 1, total: Math.min(list.length + 1, MAX_LOCAL_ENTRIES) });
+}
+
+/**
+ * Die Aufschrift des Eintragen-Knopfes. Gemerkt wird der Schluessel, weil
+ * `applyTranslations` sonst beim Sprachwechsel ein "Erneut versuchen" wieder in
+ * ein "Eintragen" zurueckverwandeln wuerde - der Knopf traegt im Markup ein
+ * data-i18n mit genau diesem Standardtext.
+ */
+let submitKey = 'entry.submit';
+
+function setSubmitLabel(key) {
+  submitKey = key;
+  el.entrySubmit.textContent = t(key);
 }
 
 async function onSubmit() {
@@ -570,13 +652,13 @@ async function onSubmit() {
 
   if (!leaderboardConfigured()) {
     el.entrySubmit.disabled = true;
-    setEntryStatus('Auf diesem Gerät gespeichert.', 'ok');
+    setEntryStatus('entry.status.localOnly', null, 'ok');
     return;
   }
 
   submitInFlight = true;
   el.entrySubmit.disabled = true;
-  setEntryStatus('Wird gesendet …');
+  setEntryStatus('entry.status.sending');
 
   const res = await submitScore(
     {
@@ -590,7 +672,7 @@ async function onSubmit() {
     {
       onRetry: (attempt, total) => {
         if (pending !== lauf) return; // die Karte zeigt laengst etwas anderes
-        setEntryStatus(`Kein Durchkommen – Versuch ${attempt} von ${total} …`);
+        setEntryStatus('entry.status.retrying', { attempt, total });
       },
     },
   );
@@ -607,22 +689,112 @@ async function onSubmit() {
     pending.submittedGlobal = true;
     pending.globalName = typed;
     el.entrySubmit.disabled = true;
-    setEntryStatus(`Eingetragen: Platz ${res.rank} von ${res.total}.`, 'ok');
+    setEntryStatus('entry.status.done', { rank: res.rank, total: res.total }, 'ok');
   } else if (res && res.rejected) {
     // Der Server hat geantwortet und Nein gesagt. Das als "nicht erreichbar" zu
     // melden schickt die spielende Person auf die Suche nach einem Netzproblem,
     // das es nicht gibt.
-    const { text, retry } = rejectionCopy(res.reason);
+    const { key, params, retry } = rejectionCopy(res.reason);
     el.entrySubmit.disabled = !retry;
-    if (retry) el.entrySubmit.textContent = 'Erneut versuchen';
-    setEntryStatus(`${text} Auf diesem Gerät ist der Lauf gespeichert.`, 'err');
+    if (retry) setSubmitLabel('entry.retry');
+    setEntryStatus('entry.status.rejected', () => ({ text: t(key, params) }), 'err');
   } else {
     // Die automatischen Versuche sind durch. Kein toter Punkt: Der Knopf wird
     // zum Wiederholen – der Lauf liegt ja schon sicher auf dem Geraet.
     el.entrySubmit.disabled = false;
-    el.entrySubmit.textContent = 'Erneut versuchen';
-    setEntryStatus('Server nicht erreichbar. Auf diesem Gerät ist der Lauf gespeichert.', 'err');
+    setSubmitLabel('entry.retry');
+    setEntryStatus('entry.status.offline', null, 'err');
   }
+}
+
+/* ------------------------------------------------------------- Sprache */
+
+/**
+ * Alle beschrifteten Stellen im Markup uebersetzen.
+ *
+ * Drei Haken, mehr braucht die Seite nicht:
+ *   `data-i18n`       -> textContent
+ *   `data-i18n-attr`  -> "attribut:schluessel|attribut:schluessel"
+ *   `data-i18n-html`  -> innerHTML, ausschliesslich fuer eigene Paketwerte
+ *                        (die Regeln auf der Startkarte tragen <b>). Fremder
+ *                        Text geht nie diesen Weg.
+ *
+ * Zum Schluss faellt `data-i18n-ready` auf <html>: Erst dann macht CSS die App
+ * sichtbar. Vorher stuende dort die englische Grundlage aus index.html.
+ */
+function applyTranslations(root = document) {
+  for (const node of root.querySelectorAll('[data-i18n]')) node.textContent = t(node.dataset.i18n);
+  for (const node of root.querySelectorAll('[data-i18n-html]')) node.innerHTML = t(node.dataset.i18nHtml);
+  for (const node of root.querySelectorAll('[data-i18n-attr]')) {
+    for (const pair of node.dataset.i18nAttr.split('|')) {
+      const sep = pair.indexOf(':');
+      if (sep < 0) continue;
+      node.setAttribute(pair.slice(0, sep).trim(), t(pair.slice(sep + 1).trim()));
+    }
+  }
+  document.documentElement.lang = t('lang.htmlLang');
+  document.documentElement.setAttribute('data-i18n-ready', '');
+}
+
+/**
+ * Die beiden Auswahlfelder fuellen. Die Sprachnamen sind Endonyme und werden
+ * NICHT uebersetzt: Wer gerade die falsche Sprache vor sich hat, muss seine
+ * eigene trotzdem lesen koennen. Uebersetzt wird nur der erste Eintrag, die
+ * automatische Erkennung.
+ */
+function fillLanguageSelects() {
+  for (const select of langSelects) {
+    select.textContent = '';
+    const auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = t('chip.language.auto');
+    select.appendChild(auto);
+    for (const { code, name } of I18N_LANGUAGES) {
+      const option = document.createElement('option');
+      option.value = code;
+      option.textContent = name;
+      select.appendChild(option);
+    }
+    select.value = prefs.language;
+  }
+}
+
+/**
+ * Die ganze Oberflaeche in der aktuellen Sprache neu malen.
+ *
+ * Bewusst OHNE Neuladen der Seite - anders als im Queens-Clone, wo eine offene
+ * Hinweiskarte und ein laufendes Brett den Neustart wert sind. Hier steht die
+ * Sprachwahl nur auf der Start- und der Endkarte: Dann laeuft keine Uhr, und
+ * die einzigen verganglichen Anzeigen sind die Endkarte und die Bestenliste,
+ * die hier beide neu gemalt werden. Ein Neuladen wuerde stattdessen den noch
+ * nicht eingetragenen Lauf kosten.
+ *
+ * Was `applyTranslations` nicht erwischt, steht darunter: alles, was aus
+ * Spielstand zusammengesetzt ist und deshalb keinen festen Text im Markup hat.
+ */
+function applyLanguage() {
+  applyTranslations();
+  fillLanguageSelects();
+  applySound();                        // "Ton an" / "Ton aus" an drei Stellen
+  if (game.level) paintLevel();
+  if (actionKey) el.action.textContent = t(actionKey);
+  bestLine(el.bestIntro);
+  bestLine(el.bestOver);
+  paintOverTitle();
+  paintRankLine();
+  el.entrySubmit.textContent = t(submitKey);
+  paintEntryStatus();
+  if (scoresOpen()) selectTab(scoreTab); // die Liste traegt Datum und Plural
+}
+
+function onLanguageChange(event) {
+  const chosen = event.target.value;
+  if (chosen === prefs.language) return;
+  prefs = save({ language: chosen });
+  // '' heisst "wie der Browser" - was dabei herauskommt, entscheidet erst
+  // `resolveLanguage`, nicht das Auswahlfeld.
+  setLanguage(resolveLanguage(chosen, browserLanguages()));
+  applyLanguage();
 }
 
 /* ------------------------------------------------------------ Bedienung */
@@ -651,6 +823,14 @@ el.btnResume.addEventListener('click', () => {
   }
 });
 
+/* Die Sprache steht auf der Start- und auf der Endkarte - beide zeigen
+   denselben Zustand, genau wie die drei Ton-Schalter. */
+const langSelects = [el.langIntro, el.langOver];
+
+for (const select of langSelects) {
+  select.addEventListener('change', onLanguageChange);
+}
+
 /* Der Ton laesst sich an drei Stellen schalten - alle zeigen denselben Zustand. */
 const soundControls = [el.btnSound, el.chipSoundIntro, el.chipSoundOver];
 
@@ -670,7 +850,7 @@ function applySound() {
   for (const control of soundControls) {
     control.setAttribute('aria-pressed', String(prefs.sound));
     const label = control.querySelector('.chip__label');
-    if (label) label.textContent = prefs.sound ? 'Ton an' : 'Ton aus';
+    if (label) label.textContent = t(prefs.sound ? 'chip.sound.on' : 'chip.sound.off');
   }
 }
 
@@ -705,8 +885,10 @@ document.addEventListener('keydown', (event) => {
 
   // Wer gerade seinen Namen tippt, startet kein neues Spiel. Die Kuerzel liegen
   // auf blanken Buchstaben, und das "n" in einem Namen wuerde sonst genau den
-  // Lauf wegwerfen, der gerade eingetragen werden soll.
-  if (event.target instanceof Element && event.target.closest('input, textarea')) return;
+  // Lauf wegwerfen, der gerade eingetragen werden soll. Fuer das Sprachfeld
+  // gilt dasselbe: Dort sucht ein Buchstabe einen Eintrag aus, und Escape
+  // schliesst die aufgeklappte Liste - beides darf nicht im Spiel landen.
+  if (event.target instanceof Element && event.target.closest('input, textarea, select')) return;
 
   // Die Bestenliste liegt ueber der Start- oder Endkarte. Escape schliesst
   // deshalb zuerst sie und kehrt dorthin zurueck, statt das Spiel zu beenden.
@@ -753,6 +935,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   });
 }
 
-applySound();
-bestLine(el.bestIntro);
+/* Uebersetzt, fuellt die Sprachwahl, setzt Ton-Aufschrift und Rekordzeile -
+   und macht die App damit ueberhaupt erst sichtbar (data-i18n-ready). */
+applyLanguage();
 showSheet(el.cardIntro);

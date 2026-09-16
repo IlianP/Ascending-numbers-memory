@@ -128,11 +128,17 @@ test('ist der Server nicht erreichbar, sagt der Reiter das und die Karte bleibt 
   }
 });
 
-test('die Reiterzeile passt auf 320 px', { skip: missing }, async () => {
+test('die Reiterzeile passt auf 320 px – in jeder Sprache', { skip: missing }, async () => {
   // Die schmalste Stelle der Karte: zwei Reiter nebeneinander. Gemessen wird am
   // Element, nicht an der Seite – `overflow-x: hidden` am Body wuerde ein
   // Ueberlaufen sonst still verschlucken.
-  const page = await openGame('/index.html', { width: 320, height: 720 });
+  //
+  // Und gemessen wird in jeder Sprache, seit es mehrere gibt: Franzoesisch und
+  // Spanisch laufen deutlich laenger als Deutsch, und ein abgeschnittener
+  // Reiter sieht immer noch aus wie ein Reiter – der meldet sich also nicht von
+  // selbst. Genau so stand "Auf dem Gerät" hier lange 19 px zu weit.
+  for (const lang of ['de-DE', 'en-GB', 'fr-FR', 'es-ES']) {
+  const page = await openGame('/index.html', { width: 320, height: 720 }, lang);
   try {
     // Der schlimmste Fall in einer Zeile: 20 Zeichen Name (mehr laesst der
     // Server nicht zu) neben vierstelligen Zahlen.
@@ -152,6 +158,12 @@ test('die Reiterzeile passt auf 320 px', { skip: missing }, async () => {
         cardRight: card.getBoundingClientRect().right,
         viewport: window.innerWidth,
         rowOverflow: row.scrollWidth - row.clientWidth,
+        // Pro Reiter, nicht nur fuer die Zeile: Ein Reiter ohne Umbruch
+        // laeuft nicht ueber, er schneidet ab - und die Zeile daneben misst
+        // sich dabei tadellos.
+        tabOverflow: Math.max(...[...tabs.querySelectorAll('.tab')]
+          .filter((t) => !t.hidden)
+          .map((t) => t.scrollWidth - t.clientWidth)),
         // Der Wert rechts darf nicht umbrechen und nicht unter den Namen rutschen.
         valLines: Math.round(val.getBoundingClientRect().height / parseFloat(getComputedStyle(val).lineHeight)),
         nameRight: name.getBoundingClientRect().right,
@@ -159,16 +171,18 @@ test('die Reiterzeile passt auf 320 px', { skip: missing }, async () => {
       };
     })()`);
 
-    assert.ok(masse.tabsOverflow <= 1, `Reiterzeile laeuft um ${masse.tabsOverflow} px ueber`);
-    assert.ok(masse.cardOverflow <= 1, `Karte laeuft um ${masse.cardOverflow} px ueber`);
-    assert.ok(masse.cardRight <= masse.viewport, 'die Karte steht ueber dem rechten Rand');
-    assert.ok(masse.rowOverflow <= 1, `die Zeile laeuft um ${masse.rowOverflow} px ueber`);
-    assert.equal(masse.valLines, 1, 'der Wert rechts bricht um');
-    assert.ok(masse.nameRight <= masse.valLeft, 'Name und Wert ueberlappen');
+    assert.ok(masse.tabsOverflow <= 1, `${lang}: Reiterzeile laeuft um ${masse.tabsOverflow} px ueber`);
+    assert.ok(masse.tabOverflow <= 1, `${lang}: ein Reiter wird um ${masse.tabOverflow} px abgeschnitten`);
+    assert.ok(masse.cardOverflow <= 1, `${lang}: Karte laeuft um ${masse.cardOverflow} px ueber`);
+    assert.ok(masse.cardRight <= masse.viewport, `${lang}: die Karte steht ueber dem rechten Rand`);
+    assert.ok(masse.rowOverflow <= 1, `${lang}: die Zeile laeuft um ${masse.rowOverflow} px ueber`);
+    assert.equal(masse.valLines, 1, `${lang}: der Wert rechts bricht um`);
+    assert.ok(masse.nameRight <= masse.valLeft, `${lang}: Name und Wert ueberlappen`);
 
     assert.deepEqual(page.errors, []);
   } finally {
     await page.close();
+  }
   }
 });
 

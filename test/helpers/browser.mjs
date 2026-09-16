@@ -99,8 +99,16 @@ function devtoolsUrl(child) {
 /**
  * Browser starten, Seite öffnen und einen kleinen Werkzeugkasten zurückgeben.
  * `viewport` ist absichtlich Handy-Format – das Spiel wird mit dem Daumen gespielt.
+ *
+ * `lang` ist die Sprache, die der Browser meldet, und sie ist voreingestellt.
+ * Seit die Oberfläche übersetzt ist, hängt jeder Test, der sichtbaren Text
+ * prüft, an dieser Angabe: Ohne sie spräche die Seite die Sprache des Rechners,
+ * auf dem der Test gerade läuft – auf dem Entwicklungsrechner Deutsch, auf dem
+ * CI-Runner Englisch, und niemand wüsste, warum. `de-DE` ist gesetzt, weil die
+ * bestehenden Tests deutsche Texte erwarten; ein Test für eine andere Sprache
+ * gibt sie hier ausdrücklich an.
  */
-export async function openGame(path = '/index.html', viewport = { width: 390, height: 780 }) {
+export async function openGame(path = '/index.html', viewport = { width: 390, height: 780 }, lang = 'de-DE') {
   const executable = findBrowser();
   if (!executable) throw new Error('kein Chrome gefunden');
 
@@ -115,6 +123,8 @@ export async function openGame(path = '/index.html', viewport = { width: 390, he
     '--disable-dev-shm-usage',
     '--no-first-run',
     '--force-device-scale-factor=1',
+    `--lang=${lang}`,
+    `--accept-lang=${lang}`,
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
@@ -157,6 +167,11 @@ export async function openGame(path = '/index.html', viewport = { width: 390, he
 
   await call('Page.enable');
   await call('Runtime.enable');
+  /* `--lang` setzt die Sprache beim Start des Browsers, `setLocaleOverride`
+     nagelt sie für dieses Ziel fest. Beides zusammen ist der Unterschied
+     zwischen "läuft bei mir" und "läuft auch auf dem Runner". Muss vor dem
+     Navigieren stehen – die Seite liest die Sprache beim Start. */
+  await call('Emulation.setLocaleOverride', { locale: lang }).catch(() => {});
   await call('Emulation.setDeviceMetricsOverride', {
     width: viewport.width,
     height: viewport.height,
@@ -250,5 +265,8 @@ export async function openGame(path = '/index.html', viewport = { width: 390, he
     await rm(profile, { recursive: true, force: true }).catch(() => {});
   }
 
-  return { evaluate, rect, click, press, typeInto, wait, errors, close };
+  /** Bildschirmfoto als base64-PNG – zum Nachsehen beim Entwickeln. */
+  const shot = async () => (await call('Page.captureScreenshot', { format: 'png' })).data;
+
+  return { evaluate, rect, click, press, typeInto, wait, shot, errors, close };
 }

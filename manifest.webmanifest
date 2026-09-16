@@ -1,7 +1,9 @@
 {
   "name": "Ascending Numbers",
   "short_name": "Ascending",
-  "description": "Zahlen einprägen, verdecken, aufsteigend antippen.",
+  "lang": "en",
+  "dir": "ltr",
+  "description": "Memorise the numbers, cover them up, tap them in ascending order.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

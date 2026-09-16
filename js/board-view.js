@@ -3,6 +3,8 @@
  * Eingaben laufen über `pointerdown`, damit sich Tipps sofort anfühlen –
  * `click` feuert auf Touch-Geräten erst nach dem Loslassen.
  */
+import { t } from './i18n.js';
+
 export class BoardView {
   constructor(el, dotsEl, onTap) {
     this.el = el;
@@ -34,7 +36,7 @@ export class BoardView {
       tile.dataset.state = 'face';
       if (!value) tile.dataset.empty = '1';
       tile.setAttribute('role', 'gridcell');
-      tile.setAttribute('aria-label', `Feld ${cell + 1}`);
+      tile.setAttribute('aria-label', t('board.cell', { n: cell + 1 }));
       tile.innerHTML = `<span>${value || ''}</span>`;
       this.el.append(tile);
       return tile;
@@ -64,7 +66,7 @@ export class BoardView {
     tile.querySelector('span').textContent = String(value);
     tile.dataset.state = 'face';
     tile.removeAttribute('data-empty');
-    tile.setAttribute('aria-label', `Feld ${cell + 1}: ${value}`);
+    tile.setAttribute('aria-label', t('board.cell.value', { n: cell + 1, value }));
     this.pop(tile);
   }
 

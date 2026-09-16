@@ -1,11 +1,17 @@
 <!doctype html>
-<html lang="de">
+<!-- lang und der Text hier sind die englische Grundlage; js/main.js tauscht beides
+     beim Start gegen die aufgeloeste Sprache (siehe applyTranslations). Bis das
+     passiert ist, haelt CSS die App auf visibility:hidden - so sieht niemand
+     einen Wimpernschlag lang die falsche Sprache. Ohne JS gibt es ohnehin kein
+     Spielfeld, das Warten kostet also nichts. -->
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e0e11" media="(prefers-color-scheme: dark)">
-<meta name="description" content="Merke dir die Zahlen im Raster und tippe sie danach verdeckt in aufsteigender Reihenfolge an.">
+<meta name="description" data-i18n-attr="content:meta.description"
+      content="Memorise where the numbers sit, then tap them in ascending order once they are covered.">
 <title>Ascending Numbers</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23111'/><text x='50' y='72' font-size='62' font-family='system-ui,sans-serif' font-weight='700' text-anchor='middle' fill='%23fff'>1</text></svg>">
 <link rel="manifest" href="manifest.webmanifest">
@@ -20,7 +26,7 @@
 
   <header class="hud" id="hud" aria-hidden="true">
     <div class="hud__side">
-      <span class="pill" id="level-pill">Level 1</span>
+      <span class="pill" id="level-pill">Round 1</span>
     </div>
 
     <div class="hud__center">
@@ -31,57 +37,65 @@
 
     <div class="hud__side hud__side--end">
       <span class="flash" id="flash" aria-hidden="true"></span>
-      <button class="icon-btn" id="btn-sound" type="button" aria-pressed="true" title="Ton an/aus">
+      <button class="icon-btn" id="btn-sound" type="button" aria-pressed="true"
+              data-i18n-attr="title:hud.sound.title" title="Sound on/off">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 9.5h3.5L12 6v12L7.5 14.5H4z" fill="currentColor" stroke-linejoin="round"/>
           <path class="icon-wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/>
           <path class="icon-mute" d="M16 9.5l5 5m0-5l-5 5"/>
         </svg>
-        <span class="visually-hidden">Ton an/aus</span>
+        <span class="visually-hidden" data-i18n="hud.sound.title">Sound on/off</span>
       </button>
-      <button class="icon-btn" id="btn-restart" type="button" title="Neues Spiel (N)">
+      <button class="icon-btn" id="btn-restart" type="button"
+              data-i18n-attr="title:hud.restart.title" title="New game (N)">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 12a8 8 0 1 1-2.34-5.66"/>
           <path d="M20 4v4h-4"/>
         </svg>
-        <span class="visually-hidden">Neues Spiel</span>
+        <span class="visually-hidden" data-i18n="hud.restart.label">New game</span>
       </button>
-      <button class="icon-btn" id="btn-quit" type="button" title="Spiel beenden (Esc)">
+      <button class="icon-btn" id="btn-quit" type="button"
+              data-i18n-attr="title:hud.quit.title" title="Quit game (Esc)">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round">
           <path d="M6 6l12 12M18 6L6 18"/>
         </svg>
-        <span class="visually-hidden">Spiel beenden</span>
+        <span class="visually-hidden" data-i18n="hud.quit.label">Quit game</span>
       </button>
     </div>
   </header>
 
   <main class="stage">
     <div class="board-wrap">
-      <div class="board" id="board" role="grid" aria-label="Spielfeld"></div>
+      <div class="board" id="board" role="grid"
+           data-i18n-attr="aria-label:board.label" aria-label="Game board"></div>
       <div class="dots" id="dots" aria-hidden="true"></div>
     </div>
 
-    <button class="action" id="action" type="button" data-idle disabled>Verdecken</button>
+    <button class="action" id="action" type="button" data-idle disabled
+            data-i18n="action.hide">Cover up</button>
   </main>
 
   <section class="sheet" id="sheet" aria-live="polite">
     <div class="card" id="card-intro">
+      <!-- Der Name des Spiels wird nicht uebersetzt - er steht so auch im
+           Manifest, im Fenstertitel und auf dem Startbildschirm. -->
       <h1>Ascending Numbers</h1>
-      <p class="lead">
-        Präge dir ein, wo die Zahlen liegen. Danach werden sie verdeckt &ndash;
-        tippe sie in aufsteigender Reihenfolge an, beginnend bei&nbsp;1.
+      <p class="lead" data-i18n="intro.lead">
+        Take in where the numbers are. Then they get covered &ndash;
+        tap them in ascending order, starting at&nbsp;1.
       </p>
       <ul class="rules">
-        <li><b>30&nbsp;Sekunden</b> Startzeit</li>
-        <li>Jede geschaffte Runde bringt bis zu <b>4&nbsp;Sekunden</b> dazu</li>
-        <li>Ab dem <b>dritten Fehler</b> einer Runde schrumpft dieser Bonus</li>
-        <li>Jede zweite Runde kommt <b>eine Zahl dazu</b></li>
-        <li>Die Uhr geht nie r&uuml;ckw&auml;rts &ndash; also: ruhig bleiben</li>
+        <li data-i18n-html="intro.rule.time"><b>30&nbsp;seconds</b> on the clock to start</li>
+        <li data-i18n-html="intro.rule.bonus">Every round you finish adds up to <b>4&nbsp;seconds</b></li>
+        <li data-i18n-html="intro.rule.penalty">From the <b>third mistake</b> of a round that bonus shrinks</li>
+        <li data-i18n-html="intro.rule.grow">Every second round adds <b>one more number</b></li>
+        <li data-i18n-html="intro.rule.clock">The clock never runs backwards &ndash; so take your time</li>
       </ul>
-      <button class="action action--lg" id="btn-start" type="button">Spiel starten</button>
+      <button class="action action--lg" id="btn-start" type="button"
+              data-i18n="intro.start">Start game</button>
       <div class="chips">
         <button class="chip" id="chip-sound-intro" type="button" aria-pressed="true">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -90,7 +104,7 @@
             <path class="icon-wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/>
             <path class="icon-mute" d="M16 9.5l5 5m0-5l-5 5"/>
           </svg>
-          <span class="chip__label">Ton an</span>
+          <span class="chip__label">Sound on</span>
         </button>
         <button class="chip" id="chip-scores-intro" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -100,19 +114,33 @@
             <path d="M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11"/>
             <path d="M12 14v3m-3.5 3h7"/>
           </svg>
-          <span class="chip__label">Bestenliste</span>
+          <span class="chip__label" data-i18n="chip.scores">Leaderboard</span>
         </button>
+        <!-- Die Sprache ist ein echtes <select> in Chip-Form: Das Betriebssystem
+             malt die Liste (auf dem Handy als Rad), die Tastatur bedient sie von
+             allein, und es bleibt lesbar, wenn eine Sprache dazukommt. Fahnen
+             waeren hier falsch - eine Flagge ist ein Land, keine Sprache. -->
+        <label class="chip chip--lang">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M3 12h18"/>
+            <path d="M12 3c2.5 2.6 2.5 15.4 0 18c-2.5-2.6-2.5-15.4 0-18z"/>
+          </svg>
+          <span class="visually-hidden" data-i18n="chip.language">Language</span>
+          <select class="chip__select" id="lang-intro"></select>
+        </label>
       </div>
       <p class="best" id="best-intro"></p>
     </div>
 
     <div class="card" id="card-over" hidden>
-      <p class="eyebrow">Zeit abgelaufen</p>
-      <h2 id="over-title">Runde 7 geschafft</h2>
+      <p class="eyebrow" data-i18n="over.eyebrow">Time is up</p>
+      <h2 id="over-title">Round 7 done</h2>
       <div class="stats">
-        <div class="stat"><b id="stat-level">7</b><span>Runden</span></div>
-        <div class="stat"><b id="stat-found">28</b><span>Zahlen</span></div>
-        <div class="stat"><b id="stat-mistakes">3</b><span>Fehler</span></div>
+        <div class="stat"><b id="stat-level">7</b><span data-i18n="over.stat.levels">Rounds</span></div>
+        <div class="stat"><b id="stat-found">28</b><span data-i18n="over.stat.found">Numbers</span></div>
+        <div class="stat"><b id="stat-mistakes">3</b><span data-i18n="over.stat.mistakes">Mistakes</span></div>
       </div>
 
       <!-- Eintragen: Der Lauf ist schon gezaehlt, hier bekommt er nur einen Namen.
@@ -121,13 +149,16 @@
       <p class="rank-line" id="rank-line" hidden></p>
       <div class="entry" id="entry" hidden>
         <input class="entry__name" id="entry-name" type="text" maxlength="20"
-               placeholder="Dein Name" aria-label="Dein Name f&uuml;r die Bestenliste"
+               data-i18n-attr="placeholder:entry.name.placeholder|aria-label:entry.name.label"
+               placeholder="Your name" aria-label="Your name for the leaderboard"
                autocomplete="nickname" enterkeyhint="done" spellcheck="false">
-        <button class="entry__submit" id="entry-submit" type="button">Eintragen</button>
+        <button class="entry__submit" id="entry-submit" type="button"
+                data-i18n="entry.submit">Submit</button>
       </div>
       <p class="entry__status" id="entry-status" aria-live="polite"></p>
 
-      <button class="action action--lg" id="btn-again" type="button">Nochmal spielen</button>
+      <button class="action action--lg" id="btn-again" type="button"
+              data-i18n="over.again">Play again</button>
       <div class="chips">
         <button class="chip" id="chip-sound-over" type="button" aria-pressed="true">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -136,7 +167,7 @@
             <path class="icon-wave" d="M15.5 9a4.2 4.2 0 0 1 0 6"/>
             <path class="icon-mute" d="M16 9.5l5 5m0-5l-5 5"/>
           </svg>
-          <span class="chip__label">Ton an</span>
+          <span class="chip__label">Sound on</span>
         </button>
         <button class="chip" id="chip-scores-over" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
@@ -146,28 +177,41 @@
             <path d="M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11"/>
             <path d="M12 14v3m-3.5 3h7"/>
           </svg>
-          <span class="chip__label">Bestenliste</span>
+          <span class="chip__label" data-i18n="chip.scores">Leaderboard</span>
         </button>
+        <label class="chip chip--lang">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/>
+            <path d="M3 12h18"/>
+            <path d="M12 3c2.5 2.6 2.5 15.4 0 18c-2.5-2.6-2.5-15.4 0-18z"/>
+          </svg>
+          <span class="visually-hidden" data-i18n="chip.language">Language</span>
+          <select class="chip__select" id="lang-over"></select>
+        </label>
       </div>
       <p class="best" id="best-over"></p>
     </div>
 
     <div class="card card--scores" id="card-scores" hidden>
-      <h2>Bestenliste</h2>
-      <div class="tabs" role="tablist" aria-label="Bestenliste w&auml;hlen">
+      <h2 data-i18n="scores.title">Leaderboard</h2>
+      <div class="tabs" role="tablist"
+           data-i18n-attr="aria-label:scores.tablist" aria-label="Choose leaderboard">
         <button class="tab" id="tab-local" type="button" role="tab" aria-selected="true"
-                aria-controls="score-list">Auf dem Ger&auml;t</button>
+                aria-controls="score-list" data-i18n="scores.tab.local">On this device</button>
         <button class="tab" id="tab-global" type="button" role="tab" aria-selected="false"
-                aria-controls="score-list" hidden>Global &#127760;</button>
+                aria-controls="score-list" hidden data-i18n="scores.tab.global">Global &#127760;</button>
       </div>
       <div class="score-list" id="score-list" role="tabpanel"></div>
-      <button class="action action--lg" id="btn-scores-close" type="button">Zur&uuml;ck</button>
+      <button class="action action--lg" id="btn-scores-close" type="button"
+              data-i18n="scores.close">Back</button>
     </div>
 
     <div class="card card--slim" id="card-pause" hidden>
-      <h2>Pause</h2>
-      <p class="lead">Die Uhr steht still.</p>
-      <button class="action action--lg" id="btn-resume" type="button">Weiter</button>
+      <h2 data-i18n="pause.title">Paused</h2>
+      <p class="lead" data-i18n="pause.lead">The clock is standing still.</p>
+      <button class="action action--lg" id="btn-resume" type="button"
+              data-i18n="pause.resume">Continue</button>
     </div>
   </section>
 
