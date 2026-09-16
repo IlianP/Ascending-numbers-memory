@@ -204,13 +204,40 @@ test('Rundenbonus landet auf der Uhr', () => {
 
 test('Rundenbonus schrumpft mit den Fehlern, aber nie unter null', () => {
   const game = new Game({}, seeded(5));
-  // Reine Rechnung auf der Regel selbst - unabhaengig davon, wie man an die
-  // Fehler kommt. `bonusFreeMistakes` Fehler sind frei, danach kostet jeder.
-  const { levelBonusMs, bonusFreeMistakes, bonusPenaltyMs } = game.config;
-  assert.equal(game.levelBonus(0), levelBonusMs);
-  assert.equal(game.levelBonus(bonusFreeMistakes), levelBonusMs, 'die freien Fehler kosten nichts');
-  assert.equal(game.levelBonus(bonusFreeMistakes + 1), levelBonusMs - bonusPenaltyMs);
-  assert.equal(game.levelBonus(bonusFreeMistakes + 99), 0, 'der Bonus wird nie negativ');
+  const { levelBonusMs, bonusFreeMistakesPerNumber, bonusPenaltyMs } = game.config;
+  // Frei ist ein Fehler je Zahl der Runde - in einer Runde mit fuenf Zahlen
+  // also fuenf. Das ist der Punkt: Grosse Runden laden zu mehr Vertippern ein.
+  const frei = 5 * bonusFreeMistakesPerNumber;
+  assert.equal(game.levelBonus(0, 5), levelBonusMs);
+  assert.equal(game.levelBonus(frei, 5), levelBonusMs, 'die freien Fehler kosten nichts');
+  assert.equal(game.levelBonus(frei + 1, 5), levelBonusMs - bonusPenaltyMs);
+  assert.equal(game.levelBonus(frei + 99, 5), 0, 'der Bonus wird nie negativ');
+
+  // Und die Grenze waechst wirklich mit der Runde mit.
+  assert.equal(game.levelBonus(4, 3), levelBonusMs - bonusPenaltyMs, '3 Zahlen: ab dem vierten Fehler');
+  assert.equal(game.levelBonus(4, 9), levelBonusMs, '9 Zahlen: vier Fehler sind frei');
+});
+
+test('pauschale und mitwachsende Freigrenze sind zweierlei', () => {
+  // Diese Unterscheidung ist nicht akademisch: Eine Vergleichsvariante in
+  // tools/balance.mjs bildete die frueher ausgelieferte Regel ("zwei Fehler
+  // frei") mit `bonusFreeMistakesPerNumber: 0` nach. Das sind aber NULL freie
+  // Fehler - der Vergleichswert war zu streng und die daraus abgeleitete
+  // Begruendung fuer die neue Grenze wertlos.
+  const pauschal = new Game({ bonusFreeMistakes: 2, bonusFreeMistakesPerNumber: 0 });
+  const voll = pauschal.config.levelBonusMs;
+  const strafe = pauschal.config.bonusPenaltyMs;
+
+  assert.equal(pauschal.levelBonus(2, 5), voll, 'zwei Fehler sind frei');
+  assert.equal(pauschal.levelBonus(3, 5), voll - strafe, 'der dritte kostet');
+  assert.equal(pauschal.levelBonus(2, 12), voll, 'und zwar unabhaengig von der Rundengroesse');
+
+  const keine = new Game({ bonusFreeMistakes: 0, bonusFreeMistakesPerNumber: 0 });
+  assert.equal(keine.levelBonus(1, 5), voll - strafe, 'ohne Freigrenze kostet schon der erste');
+
+  const mitwachsend = new Game({ bonusFreeMistakes: 0, bonusFreeMistakesPerNumber: 1 });
+  assert.equal(mitwachsend.levelBonus(5, 5), voll);
+  assert.equal(mitwachsend.levelBonus(5, 3), voll - 2 * strafe, 'kleine Runde, engere Grenze');
 });
 
 test('wildes Durchprobieren verdient keine Zeit', () => {
@@ -235,7 +262,10 @@ test('wildes Durchprobieren verdient keine Zeit', () => {
   assert.equal(letzter.levelDone, true, 'die Runde wurde abgeschlossen');
   assert.equal(letzter.bonusMs, 0, 'aber sie bringt keine Zeit ein');
   assert.equal(game.deadline, deadlineVorher, 'und sie kostet auch keine');
-  assert.ok(game.levelMistakes > game.config.bonusFreeMistakes);
+  assert.ok(
+    game.levelMistakes > game.board.count * game.config.bonusFreeMistakesPerNumber,
+    'der Abtipper muss ueber der Freigrenze der Runde liegen',
+  );
 });
 
 test('Fehlerzaehler der Runde startet mit jeder Runde neu', () => {

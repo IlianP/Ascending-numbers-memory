@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 82 Tests)
+npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Browser (node:test, 83 Tests)
 ```
 
 ## Spielablauf
@@ -27,7 +27,7 @@ npm test      # Logik, Balance, Sprachpakete, Service Worker und Layout im Brows
 | Raster | 3×3, ab 10 Zahlen 4×4, ab 17 dann 5×5 | `js/level.js` → `levelSpec` |
 | Fehler | kosten keine Uhrzeit | `wrongPenaltyMs` |
 | Rundenbonus | bis zu +4 s pro geschaffter Runde | `levelBonusMs` |
-| &nbsp;&nbsp;davon frei | 2 Fehler pro Runde | `bonusFreeMistakes` |
+| &nbsp;&nbsp;davon frei | ein Fehler **je Zahl** der Runde | `bonusFreeMistakesPerNumber` |
 | &nbsp;&nbsp;danach | −2 s Bonus je weiterem Fehler, bis 0 | `bonusPenaltyMs` |
 
 ### Schwierigkeitsgrad
@@ -53,7 +53,8 @@ node tools/balance.mjs
 Vorher war das größere Raster toter Code: Das 4×4 beginnt in Runde 15, die in 50 Sekunden
 niemand erreicht. Jetzt ist es der Lohn fürs Gutspielen. Die Zeitstrafe pro Fehltipp
 (`wrongPenaltyMs`) bleibt bei `0` – die Uhr geht nie rückwärts. Was Fehler kosten, ist
-der *Bonus* der laufenden Runde, und auch der erst ab dem dritten: siehe unten.
+der *Bonus* der laufenden Runde, und auch der erst jenseits eines Fehlers je Zahl:
+siehe unten.
 
 ## Was gegenüber der Vorlage anders ist
 
@@ -137,122 +138,75 @@ fest, dass nach einem Fehltipp keine Zahl offen liegt.
 **Der Rundenbonus finanzierte das Durchprobieren.** Eine Runde abzutippen kostete
 weniger Zeit, als die +4 s einbrachten – der Lauf trug sich selbst und dauerte
 statt 30 gut 150 Sekunden. Jetzt **schrumpft der Bonus mit den Fehlern der
-Runde**: zwei sind frei, jeder weitere kostet 2 s davon, bei 0 ist Schluss. Wer
-sich durch eine Runde tippt, verdient also keine Zeit mehr und verhungert an der
-Startzeit.
+Runde**: frei ist ein Fehltipp je Zahl, jeder weitere kostet 2 s davon, bei 0 ist
+Schluss. Wer sich durch eine Runde tippt, verdient also keine Zeit mehr und
+verhungert an der Startzeit.
 
 Wichtig dabei: **Die Uhr geht nie rückwärts.** Ein Fehler zieht nichts ab, er
 lässt nur weniger dazukommen – `wrongPenaltyMs` steht weiter auf `0`. Ein
 Fehltipp soll den Lauf nicht auffressen, er soll ihn nur nicht verlängern.
 
-Warum ausgerechnet „zwei frei, dann 2 s"? Weil die Strafhöhe den Abtipper kaum
-interessiert: Er macht pro Runde so viele Fehler, dass der Bonus bei *jeder*
-Strafe auf 0 fällt – seine Werte sind über alle Varianten hinweg dieselben
-(24/49/74). Die Strafe trifft also fast nur die ehrlichen Spieler, und deshalb
-ist die mildeste Variante, die den Abtipper noch aushungert, die richtige. Eine
-härtere (ein Fehler frei, 1 s je weiterem) kostete den mittleren Spieler 4 Zahlen
-mehr und den Abtipper nichts.
+### Die Freigrenze wächst mit der Runde – und warum sie das muss
 
-Was bleibt: Wer 30 Sekunden lang zwölf Mal pro Sekunde tippt, landet bei ~74
-Zahlen – unter dem mittleren Spieler, aber über dem langsamen. Dafür steht dann
-„rund 200 Fehler" in der Zeile. Ganz ausschließen lässt sich das nicht, ohne
-ehrliches Spiel zu bestrafen; `test/balance.test.mjs` hält fest, dass der
-Abtipper unter dem mittleren Spieler bleibt und sein Lauf keine 30 Sekunden
-übersteht.
+Zuerst waren es pauschal zwei Fehler pro Runde. Das war ein Fehlgriff, und der
+erste echte Lauf hat ihn aufgedeckt: 17 Runden, 123 Zahlen, **60 Fehler** – also
+0,49 Fehler je Zahl. Das Simulationsmodell hatte mit rund 10 Fehlern *pro
+Durchlauf* gerechnet und die Regel deshalb als praktisch kostenlos ausgewiesen.
 
-## Sprachen
+Der Grund für den Irrtum steckte im Modell selbst: Es ließ **höchstens einen
+Fehltipp je Zahl** zu. Damit kann ein simulierter Spieler eine Grenze von zwei
+Fehlern pro Runde kaum reißen – die Simulation konnte den Schaden gar nicht
+sehen. Ein echter Mensch, der eine Zahl vergessen hat, tippt dagegen mehrfach
+daneben, und Fehler häufen sich dort, wo es weh tut: in den **späten, großen
+Runden**. Eine feste Grenze traf also genau die Runden, die ohnehin die
+schwersten sind.
 
-Die Oberfläche spricht **Deutsch, Englisch, Französisch und Spanisch**. Welche
-Sprache gilt, entscheidet in dieser Reihenfolge:
+`tools/balance.mjs` zieht die Fehltipps je Zahl jetzt geometrisch (Erwartungswert
+`errorRate`) und kennt ein viertes Profil `gemessen`, geeicht an jenem Lauf unter
+der damals geltenden Regel (~165 ms je Tipp, 0,5 Fehler je Zahl → 18,2 Runden /
+132,2 Zahlen / 66 Fehler gegen die gemessenen 17 / 123 / 60). Damit lässt sich
+die Freigrenze messen statt schätzen (gefundene Zahlen, Mittel aus 200 Läufen):
 
-1. was im Sprachfeld ausdrücklich gewählt wurde,
-2. sonst die erste Browsersprache, für die es ein Paket gibt (`de-AT` → `de`),
-3. sonst **Englisch**.
+| Freigrenze | `gemessen` | Abtipper 8/s | Abtipper 12/s |
+| --- | --- | --- | --- |
+| gar keine Regel | 341,8 | 168,4 | 293,1 |
+| pauschal 2 frei (vorher) | 132,2 | 49,4 | 73,7 |
+| pauschal 4 frei | 186,9 | 50,6 | 75,3 |
+| halbe Rundengröße | 196,4 | 49,5 | 73,8 |
+| **einer je Zahl** | **321,1** | **51,1** | **76,4** |
+| anderthalb je Zahl | 338,0 | 57,0 | 86,8 |
+| zwei je Zahl | 341,0 | 73,3 | 106,2 |
 
-Punkt 3 ist Absicht und nicht Deutsch, obwohl das Spiel auf Deutsch entstanden
-ist: Wer eine Sprache mitbringt, die es hier nicht gibt, bekommt die mit der
-größten Reichweite. Aus demselben Grund liefert `index.html` den englischen Text
-roh aus – er ist die Grundlage, an der alle Pakete gemessen werden.
+Die Tabelle zeigt einen klaren Knick. Bis „einer je Zahl" bleibt der Abtipper
+vollständig ausgebremst (76,4 gegen 73,7 bei der strengsten Variante) – die
+Großzügigkeit kostet also **nichts** an Schutz, holt dem ehrlichen Spieler aber
+94 % seines Ergebnisses zurück. Ab anderthalb Fehlern je Zahl klettert der
+Abtipper (86,8), bei zweien ist die Bremse praktisch weg (106,2), während der
+ehrliche Spieler nichts mehr dazugewinnt. Genau an diesem Knick liegt die Regel.
 
-### Umgestellt wird über ein Auswahlfeld, nicht über Flaggen
+Dahinter steckt ein allgemeineres Muster: Der Abtipper macht pro Zahl ein halbes
+Brett an Fehlversuchen und liegt damit über fast jeder denkbaren Grenze. Sie
+trifft deshalb vor allem ehrliche Spieler – und die richtige Einstellung ist
+**so großzügig wie möglich, solange die Strafe überhaupt greift**.
 
-Der Chip mit dem Globus auf der Start- und der Endkarte ist ein echtes
-`<select>` in Chip-Form. Das hat zwei Gründe. Erstens malt das Betriebssystem
-die Liste selbst – auf dem Handy als Rad, auf dem Rechner als Menü –, es gibt
-also kein nachgebautes Aufklappmenü, nichts an der Tastaturbedienung
-nachzurüsten und nichts, was bei einer fünften Sprache neu geschrieben werden
-müsste. Zweitens sind **Flaggen keine Sprachen**: Eine Flagge ist ein Land, und
-schon beim Spanischen wäre die Frage, welches. Die Sprachen stehen deshalb unter
-ihrem eigenen Namen da (*Deutsch*, *English*, *Français*, *Español*) und werden
-nie übersetzt – wer gerade die falsche Sprache vor sich hat, muss seine eigene
-trotzdem lesen können.
+Ein einzelner echter Lauf ist eine dünne Grundlage; das Profil gehört
+nachgezogen, sobald mehr Läufe vorliegen. Die Richtung hängt aber nicht daran,
+wie gut es getroffen ist, sondern am flachen Verlauf der rechten Spalten.
 
-Der Wechsel wirkt **sofort, ohne die Seite neu zu laden**. Das Feld steht nur auf
-der Start- und der Endkarte, dort läuft also keine Uhr; die einzigen
-vergänglichen Anzeigen sind die Endkarte und die Bestenliste, und die werden neu
-gemalt. Ein Neuladen würde stattdessen genau das kosten, was gerade auf der
-Endkarte steht: den noch nicht eingetragenen Lauf.
+**Eine Warnung aus eigener Erfahrung:** Die pauschale Grenze
+(`bonusFreeMistakes`) und die mitwachsende (`bonusFreeMistakesPerNumber`) sind
+zweierlei, und wer eine Vergleichsvariante mit `bonusFreeMistakesPerNumber: 0`
+baut, modelliert **null** freie Fehler statt zwei. Eine erste Fassung dieser
+Tabelle lief genau in diese Falle: Der Vergleichswert war zu streng, das daran
+geeichte Spielerprofil zu gut, und die abgeleitete Aussage („kostet 80 %")
+falsch – richtig sind 61 %. `test/game.test.mjs` hält die beiden Grenzen
+seitdem auseinander.
 
-### Wie ein Sprachpaket aussieht
-
-`js/i18n.js` ist reine Logik (`t()`, `resolveLanguage()`, die Paketliste) und
-kennt kein DOM – genauso geschichtet wie `js/scores.js` und `js/leaderboard.js`.
-Die Pakete in `js/i18n/` sind flache Zuordnungen `Schlüssel → Text`, wobei ein
-Wert auch eine **Funktion** sein darf:
-
-```js
-'hud.level':  ({ n }) => `Runde ${n}`,
-'over.done':  ({ levels }) => `${dePlural(levels, 'Runde', 'Runden')} geschafft`,
-```
-
-Zusammengesetzte Sätze sind bewusst Funktionen und keine `%s`-Vorlagen:
-Wortstellung und Kongruenz unterscheiden sich, und Plural ist nicht überall
-dieselbe Regel – Französisch lässt die 0 im Singular („0 erreur"), Deutsch nicht.
-Jedes Paket bringt deshalb seine eigene Plural-Hilfe mit; eine gemeinsame
-Plural-Maschine gibt es nicht und sollte es nicht geben. Reine Gebietsschema-Daten
-– Datumsformat, Monatsnamen – kommen aus `Intl`, nicht aus der Übersetzung.
-
-### Was nicht übersetzt wird
-
-- **Der Name des Spiels.** „Ascending Numbers" steht so im Fenstertitel, im
-  Manifest und auf dem Startbildschirm.
-- **`manifest.webmanifest`.** Ein Manifest kann der Sprache der Oberfläche nicht
-  folgen; Name und Beschreibung stehen deshalb auf Englisch, passend zur
-  Grundlage in `index.html`.
-- **Kommentare, SQL und dieses README.** Das ist Text für die Entwicklung, nicht
-  für die spielende Person.
-
-### Eine Sprache hinzufügen
-
-1. `js/i18n/en.js` kopieren und übersetzen,
-2. in `I18N_PACKS` **und** `I18N_LANGUAGES` (in `js/i18n.js`) eintragen,
-3. die neue Datei in die `ASSETS`-Liste von `sw.js` aufnehmen und dort `VERSION`
-   hochzählen,
-4. das Kürzel in `test/language.test.mjs` und in der Sprachschleife von
-   `test/leaderboard-ui.test.mjs` ergänzen,
-5. `npm test` laufen lassen.
-
-`test/i18n.test.mjs` prüft dabei alles, was sich mechanisch prüfen lässt:
-gleiche Schlüsselmengen, gleiche Wertform (String hier, Funktion dort), dass
-jede Vorlage läuft und keinen Parameter fallen lässt – und umgekehrt, dass kein
-Schlüssel ungenutzt herumsteht. Die letzte Prüfung kommt ohne Pflegeliste aus:
-Sie vergleicht, welche Zeichenketten in `js/` einem bekannten Schlüssel
-*gleichen*, statt zu raten, was nach einem Schlüssel aussieht.
-
-### Achtung: Länge
-
-Französisch und Spanisch laufen 15 bis 30 Prozent länger als Englisch, und die
-engste Zeile der App ist die Reiterzeile der Bestenliste – zwei Reiter
-nebeneinander auf 320 px, beide ohne Umbruch. Genau dort stand „Auf dem Gerät"
-19 px zu weit und wurde abgeschnitten, ohne dass irgendetwas überlief: Ein
-abgeschnittener Reiter sieht immer noch aus wie ein Reiter. Deshalb misst
-`test/leaderboard-ui.test.mjs` jetzt **jeden Reiter einzeln, in jeder Sprache**,
-und die Chipreihe darf umbrechen, statt Text zu quetschen.
-
-Wer Text prüft, muss außerdem die Sprache festnageln: `openGame(pfad, viewport,
-'fr-FR')`. Ohne das dritte Argument spräche die Seite die Sprache des Rechners,
-auf dem der Test gerade läuft – voreingestellt ist `de-DE`, weil die älteren
-Tests deutsche Texte erwarten.
+Was bleibt: Wer 30 Sekunden lang zwölf Mal pro Sekunde tippt, landet bei ~76
+Zahlen. Dafür steht dann „rund 200 Fehler" in der Zeile. Ganz ausschließen lässt
+sich das nicht, ohne ehrliches Spiel zu bestrafen; `test/balance.test.mjs` hält
+fest, dass der Abtipper unter dem mittleren Spieler bleibt und sein Lauf keine
+30 Sekunden übersteht.
 
 ## Bestenliste
 

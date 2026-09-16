@@ -39,7 +39,7 @@ export const I18N_DE = {
     'Präge dir ein, wo die Zahlen liegen. Danach werden sie verdeckt – tippe sie in aufsteigender Reihenfolge an, beginnend bei\u00a01.',
   'intro.rule.time': '<b>30&nbsp;Sekunden</b> Startzeit',
   'intro.rule.bonus': 'Jede geschaffte Runde bringt bis zu <b>4&nbsp;Sekunden</b> dazu',
-  'intro.rule.penalty': 'Ab dem <b>dritten Fehler</b> einer Runde schrumpft dieser Bonus',
+  'intro.rule.penalty': 'Ein Fehltipp <b>je Zahl</b> ist frei &ndash; wer r&auml;t, verliert den Bonus',
   'intro.rule.grow': 'Jede zweite Runde kommt <b>eine Zahl dazu</b>',
   'intro.rule.clock': 'Die Uhr geht nie r&uuml;ckw&auml;rts &ndash; also: ruhig bleiben',
   'intro.start': 'Spiel starten',

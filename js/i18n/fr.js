@@ -51,7 +51,7 @@ export const I18N_FR = {
     'Retenez où se trouvent les nombres. Ils seront ensuite masqués – touchez-les dans l’ordre croissant, en commençant par\u00a01.',
   'intro.rule.time': '<b>30&nbsp;secondes</b> au départ',
   'intro.rule.bonus': 'Chaque manche réussie rapporte jusqu’à <b>4&nbsp;secondes</b>',
-  'intro.rule.penalty': 'À partir de la <b>troisième erreur</b> d’une manche, ce bonus fond',
+  'intro.rule.penalty': 'Une erreur <b>par nombre</b> est offerte : deviner coûte le bonus',
   'intro.rule.grow': 'Une manche sur deux ajoute <b>un nombre</b>',
   'intro.rule.clock': 'Le chrono ne recule jamais &ndash; alors, du calme',
   'intro.start': 'Commencer',

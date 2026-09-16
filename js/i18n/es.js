@@ -49,7 +49,7 @@ export const I18N_ES = {
     'Fíjate en dónde están los números. Después se tapan: tócalos en orden ascendente, empezando por el 1.',
   'intro.rule.time': '<b>30&nbsp;segundos</b> para empezar',
   'intro.rule.bonus': 'Cada ronda superada suma hasta <b>4&nbsp;segundos</b>',
-  'intro.rule.penalty': 'A partir del <b>tercer fallo</b> de una ronda, ese bono mengua',
+  'intro.rule.penalty': 'Un fallo <b>por n&uacute;mero</b> es gratis: adivinar cuesta el bono',
   'intro.rule.grow': 'Cada dos rondas aparece <b>un número más</b>',
   'intro.rule.clock': 'El reloj nunca va hacia atrás &ndash; así que con calma',
   'intro.start': 'Empezar partida',
