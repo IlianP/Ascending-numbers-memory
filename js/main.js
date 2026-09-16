@@ -477,9 +477,28 @@ function commitPending(name) {
   pending.savedRank = rank;
 }
 
+/**
+ * Den Lauf sichern, ohne ihn aus der Hand zu geben. Fuer den Fall, dass die
+ * Seite gleich verschwinden koennte (Tab zu, App in den Hintergrund) - dort
+ * waere `pending = null` falsch: Kommt die Seite doch zurueck, steht die
+ * Endkarte noch da und ihr "Eintragen" muss weiter funktionieren.
+ *
+ * Genommen wird der gerade getippte Name, nicht der gemerkte: Wer ihn eben
+ * eingegeben hat, soll ihn auch in der Liste wiederfinden.
+ *
+ * Bewusst in Kauf genommen: Wer danach zurueckkommt, den Namen aendert und erst
+ * dann "Eintragen" drueckt, steht lokal unter dem alten und global unter dem
+ * neuen Namen. Ein gespeicherter Eintrag wird hier nicht noch einmal
+ * umgeschrieben - das waere ein Aenderungspfad in den Punktespeicher fuer einen
+ * Schoenheitsfehler.
+ */
+function persistPending() {
+  if (pending && !pending.saved) commitPending(sanitizeName(el.entryName.value) || prefs.name);
+}
+
 /** Beim Verlassen der Endkarte: nicht Eingetragenes trotzdem sichern. */
 function flushPending() {
-  if (pending && !pending.saved) commitPending(prefs.name);
+  persistPending();
   pending = null;
 }
 
@@ -537,6 +556,13 @@ async function onSubmit() {
   // keine zweite Zeile an – aber gar nicht erst zu senden ist billiger.
   if (!pending || submitInFlight || pending.submittedGlobal) return;
 
+  // Ab hier zaehlt DIESER Lauf, nicht das, was `pending` spaeter sein wird:
+  // Ein Eintrag darf samt Wiederholungen ueber fuenf Sekunden brauchen, und in
+  // der Zeit kann "Nochmal spielen" laengst gedrueckt sein. Ohne den Festhalter
+  // lief die Antwort danach entweder in ein `null` (Absturz) oder markierte den
+  // inzwischen frischen Lauf als eingetragen - unter dem alten Namen.
+  const lauf = pending;
+
   const typed = sanitizeName(el.entryName.value);
   if (typed && typed !== prefs.name) prefs = save({ name: typed });
   commitPending(typed); // erst aufs Geraet, dann ins Netz
@@ -556,14 +582,26 @@ async function onSubmit() {
     {
       name: typed,
       mode: MODE,
-      levels: pending.levels,
-      found: pending.found,
-      mistakes: pending.mistakes,
-      submissionId: pending.submissionId,
+      levels: lauf.levels,
+      found: lauf.found,
+      mistakes: lauf.mistakes,
+      submissionId: lauf.submissionId,
     },
-    { onRetry: (attempt, total) => setEntryStatus(`Kein Durchkommen – Versuch ${attempt} von ${total} …`) },
+    {
+      onRetry: (attempt, total) => {
+        if (pending !== lauf) return; // die Karte zeigt laengst etwas anderes
+        setEntryStatus(`Kein Durchkommen – Versuch ${attempt} von ${total} …`);
+      },
+    },
   );
   submitInFlight = false;
+
+  // Inzwischen laeuft ein anderes Spiel: Die Antwort gehoert zu einer Karte,
+  // die es nicht mehr gibt. Der Eintrag ist trotzdem angekommen (oder eben
+  // nicht) - hier ist nur nichts mehr anzuzeigen. Der Lauf ist lokal
+  // gespeichert, und seine Kennung verhindert eine Dublette, falls er je
+  // erneut gesendet wird.
+  if (pending !== lauf) return;
 
   if (res && Number.isFinite(res.rank)) {
     pending.submittedGlobal = true;
@@ -638,6 +676,7 @@ function applySound() {
 
 /* Tab im Hintergrund: Uhr anhalten statt den Lauf zu verschenken. */
 document.addEventListener('visibilitychange', () => {
+  if (document.hidden) persistPending();
   if (document.hidden && game.running && !game.paused) {
     game.pause(now());
     cancelAnimationFrame(raf);
@@ -645,6 +684,18 @@ document.addEventListener('visibilitychange', () => {
     showSheet(el.cardPause);
   }
 });
+
+/*
+ * Die Seite verschwindet gleich. Ein fertiger Lauf, der noch auf der Endkarte
+ * steht, muss vorher in die Liste - sonst ist er weg, und das Versprechen
+ * "gespeichert wird immer" waere keines.
+ *
+ * `pagehide` statt `beforeunload`: Auf dem Handy wird eine App oft gar nicht
+ * "entladen", sondern eingefroren, und dann feuert `beforeunload` nie. Das
+ * `visibilitychange` oben faengt genau diesen Fall zusaetzlich ab - doppelt
+ * gemoppelt ist hier richtig, weil `commitPending` ohnehin nur einmal wirkt.
+ */
+window.addEventListener('pagehide', persistPending);
 
 /* Tastatur: Ziffernblock-Layout auf das 3×3-Raster. */
 const KEYS = { 7: 0, 8: 1, 9: 2, 4: 3, 5: 4, 6: 5, 1: 6, 2: 7, 3: 8 };
