@@ -68,11 +68,18 @@ export class BoardView {
     this.pop(tile);
   }
 
-  /** Falsch getippt: Feld kurz aufblitzen lassen, dann wieder zudecken. */
-  blunder(cell, value, ms) {
+  /**
+   * Falsch getippt: Feld kurz aufblitzen lassen, dann wieder zudecken.
+   *
+   * Die Zahl des Feldes wird dabei bewusst NICHT gezeigt. Sie stand hier
+   * einmal 380 ms lang offen da - und damit liess sich das Merkspiel komplett
+   * umgehen: einmal quer ueber das Brett getippt, und die ganze Belegung war
+   * bekannt. Rueckmeldung genug sind die graue Kachel, der Punkt oben rechts,
+   * Ton und Vibration; welche Zahl dran ist, sagen die Fortschrittspunkte.
+   */
+  blunder(cell, ms) {
     const tile = this.tiles[cell];
     if (!tile) return;
-    tile.querySelector('span').textContent = value ? String(value) : '';
     tile.dataset.state = 'wrong';
     this.after(`wrong-${cell}`, ms, () => {
       if (tile.dataset.state !== 'wrong') return;

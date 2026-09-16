@@ -25,6 +25,7 @@ export class Game {
     this.revealed = new Set();
     this.found = 0;
     this.mistakes = 0;
+    this.levelMistakes = 0;
     this.deadline = 0;
     this.frozenMs = null;
   }
@@ -47,8 +48,25 @@ export class Game {
     this.board = createBoard(this.level, this.config, this.rng);
     this.next = 1;
     this.revealed = new Set();
+    this.levelMistakes = 0;
     this.phase = 'preview';
     return this.board;
+  }
+
+  /**
+   * Der Bonus, den die laufende Runde noch einbringt.
+   *
+   * Der erste Fehler ist geschenkt, jeder weitere knabbert am Bonus, bis
+   * nichts mehr uebrig ist. Das ist der Schutz gegen wildes Durchprobieren:
+   * Wer sich durch eine Runde tippt, statt sie sich zu merken, bekommt keine
+   * Zeit dafuer – und ohne neue Zeit ist der Durchlauf nach der Startzeit
+   * vorbei. Ausdruecklich KEIN Abzug von der Uhr: Sie geht nie rueckwaerts,
+   * sie waechst nur langsamer. Ein Fehltipp soll den Lauf nicht auffressen,
+   * er soll ihn nur nicht laenger machen.
+   */
+  levelBonus(mistakes = this.levelMistakes) {
+    const over = Math.max(0, mistakes - this.config.bonusFreeMistakes);
+    return Math.max(0, this.config.levelBonusMs - this.config.bonusPenaltyMs * over);
   }
 
   /** Vorschau beenden – ab jetzt wird getippt. */
@@ -60,10 +78,13 @@ export class Game {
 
   /**
    * Tipp auf ein Feld.
-   * @returns {{result:'ignored'|'correct'|'wrong', value:number, levelDone:boolean}}
+   * `bonusMs` ist die Zeit, die eine damit abgeschlossene Runde einbringt –
+   * die Oberflaeche zeigt genau diesen Wert an, nicht den Wert aus der
+   * Konfiguration (siehe `levelBonus`).
+   * @returns {{result:'ignored'|'correct'|'wrong', value:number, levelDone:boolean, bonusMs:number}}
    */
   tap(cell, now = 0) {
-    const miss = { result: 'ignored', value: 0, levelDone: false };
+    const miss = { result: 'ignored', value: 0, levelDone: false, bonusMs: 0 };
     if (this.phase !== 'playing' || this.paused || !this.board) return miss;
     // Zwischen zwei Frames kann die Zeit ablaufen, bevor `checkTime` es merkt.
     // Ein Tipp danach darf nichts mehr bewirken – sonst weckt der Rundenbonus
@@ -76,8 +97,9 @@ export class Game {
 
     if (value !== this.next) {
       this.mistakes += 1;
+      this.levelMistakes += 1;
       if (this.config.wrongPenaltyMs) this.deadline -= this.config.wrongPenaltyMs;
-      return { result: 'wrong', value, levelDone: false };
+      return { result: 'wrong', value, levelDone: false, bonusMs: 0 };
     }
 
     this.revealed.add(cell);
@@ -85,9 +107,10 @@ export class Game {
     this.found += 1;
 
     const levelDone = this.next > this.board.count;
-    if (levelDone && this.config.levelBonusMs) this.deadline += this.config.levelBonusMs;
+    const bonusMs = levelDone ? this.levelBonus() : 0;
+    if (bonusMs) this.deadline += bonusMs;
 
-    return { result: 'correct', value, levelDone };
+    return { result: 'correct', value, levelDone, bonusMs };
   }
 
   remaining(now) {

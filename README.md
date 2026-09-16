@@ -8,7 +8,7 @@ Kein Build, keine Abhängigkeiten – reines HTML/CSS/ES-Module. `index.html` ö
 
 ```bash
 npm start     # http://localhost:8000
-npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 54 Tests)
+npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test, 62 Tests)
 ```
 
 ## Spielablauf
@@ -25,8 +25,10 @@ npm test      # Logik, Balance, Service Worker und Layout im Browser (node:test,
 | Zahlen in Runde 1 | 3 | `baseCount` |
 | Steigerung | jede 2. Runde eine Zahl mehr | `growEvery` |
 | Raster | 3×3, ab 10 Zahlen 4×4, ab 17 dann 5×5 | `js/level.js` → `levelSpec` |
-| Fehler | kosten nur die Zeit, die sie brauchen | `wrongPenaltyMs` |
-| Rundenbonus | +4 s pro geschaffter Runde | `levelBonusMs` |
+| Fehler | kosten keine Uhrzeit | `wrongPenaltyMs` |
+| Rundenbonus | bis zu +4 s pro geschaffter Runde | `levelBonusMs` |
+| &nbsp;&nbsp;davon frei | 2 Fehler pro Runde | `bonusFreeMistakes` |
+| &nbsp;&nbsp;danach | −2 s Bonus je weiterem Fehler, bis 0 | `bonusPenaltyMs` |
 
 ### Schwierigkeitsgrad
 
@@ -50,7 +52,8 @@ node tools/balance.mjs
 
 Vorher war das größere Raster toter Code: Das 4×4 beginnt in Runde 15, die in 50 Sekunden
 niemand erreicht. Jetzt ist es der Lohn fürs Gutspielen. Die Zeitstrafe pro Fehltipp
-(`wrongPenaltyMs`) bleibt bei `0` – Fehler kosten die Zeit, die sie brauchen, das reicht.
+(`wrongPenaltyMs`) bleibt bei `0` – die Uhr geht nie rückwärts. Was Fehler kosten, ist
+der *Bonus* der laufenden Runde, und auch der erst ab dem dritten: siehe unten.
 
 ## Was gegenüber der Vorlage anders ist
 
@@ -61,6 +64,7 @@ Im Video wirkt das Original träge, deshalb liegt der Schwerpunkt auf Reaktion:
 - Jeder Tipp bestätigt sich dreifach: Kachel-Animation, Farbpunkt oben rechts,
   kurzer Ton **und** Vibration (Android).
 - Fortschrittspunkte unter dem Raster zeigen, welche Zahl als Nächstes dran ist.
+- Ein Fehltipp blitzt auf, verrät aber nicht, welche Zahl dort lag (siehe unten).
 - Uhr als Ziffern **und** als Balken, unter 10 Sekunden rot.
 - Wechselt man den Tab, hält die Uhr an, statt den Lauf zu verschenken.
 - Hell/Dunkel nach Systemeinstellung, Layout von 320 px bis Desktop – die schmalen
@@ -93,6 +97,67 @@ Uhr und drei Knöpfen so voll, dass symmetrische Spalten (`1fr auto 1fr`) nicht 
 passen – die linke Spalte wird dann so breit wie die Knopfleiste rechts und schiebt den
 Beenden-Knopf aus dem Bild. Jede Seite nimmt jetzt nur, was sie braucht.
 
+Und sie hält die Karten bedienbar. Auf einem 320×568-Display passt die Startkarte
+nicht mehr ganz ins Bild – der „Spiel starten"-Knopf lag bei 626 px, also außerhalb,
+und das Spiel ließ sich dort schlicht nicht starten. Ein zentrierter Inhalt, der
+überläuft, lässt sich aber **nicht** herunterscrollen: Genau das ist die Falle bei
+`place-items: center`. Die Lade ist deshalb eine Flex-Spalte mit `overflow-y: auto`
+und die Karte hat `margin: auto` – zentriert, solange Platz ist, scrollbar, sobald
+keiner mehr da ist. Der Test klickt den Knopf danach wirklich an, statt sich mit
+„sichtbar" zufriedenzugeben.
+
+## Abtippen darf sich nicht lohnen
+
+Ein Merkspiel, das man auch durch schnelles Abtippen aller Felder gewinnt, ist
+keines. Gemessen wird das nicht nach Gefühl: `tools/balance.mjs` lässt neben den
+drei Menschenmodellen einen **Abtipper** gegen die echte Spiellogik spielen. Er
+prägt sich nichts ein, drückt sofort „Verdecken" und klappert die Felder reihum
+ab. Verglichen wird an `found` (gefundene Zahlen) – das ist es, was die
+Bestenliste wertet.
+
+Ohne Schutz gewann er, und zwar deutlich:
+
+| | schnell | mittel | langsam | Abtipper 4/s | 8/s | 12/s |
+| --- | --- | --- | --- | --- | --- | --- |
+| ohne Schutz | 227,5 | 124,5 | 66,4 | 79,4 | **168,4** | **293,1** |
+| heute | 226,6 | 123,1 | 64,9 | 24,4 | 49,4 | 73,7 |
+
+Zwei Dinge machten das möglich, und beide sind behoben:
+
+**Der Fehltipp zeigte die Zahl.** Die falsch getippte Kachel schrieb 380 ms lang
+ihre eigene Zahl hinein. Einmal quer über das Brett getippt, und die ganze
+Belegung war bekannt – das war kein Durchprobieren mehr, das war ein Blick in
+die Karten. Jetzt blitzt die Kachel nur noch grau auf. Rückmeldung genug sind
+Farbe, Punkt, Ton und Vibration; *welche* Zahl dran ist, sagen die
+Fortschrittspunkte ohnehin. `test/controls.test.mjs` hält im echten Browser
+fest, dass nach einem Fehltipp keine Zahl offen liegt.
+
+**Der Rundenbonus finanzierte das Durchprobieren.** Eine Runde abzutippen kostete
+weniger Zeit, als die +4 s einbrachten – der Lauf trug sich selbst und dauerte
+statt 30 gut 150 Sekunden. Jetzt **schrumpft der Bonus mit den Fehlern der
+Runde**: zwei sind frei, jeder weitere kostet 2 s davon, bei 0 ist Schluss. Wer
+sich durch eine Runde tippt, verdient also keine Zeit mehr und verhungert an der
+Startzeit.
+
+Wichtig dabei: **Die Uhr geht nie rückwärts.** Ein Fehler zieht nichts ab, er
+lässt nur weniger dazukommen – `wrongPenaltyMs` steht weiter auf `0`. Ein
+Fehltipp soll den Lauf nicht auffressen, er soll ihn nur nicht verlängern.
+
+Warum ausgerechnet „zwei frei, dann 2 s"? Weil die Strafhöhe den Abtipper kaum
+interessiert: Er macht pro Runde so viele Fehler, dass der Bonus bei *jeder*
+Strafe auf 0 fällt – seine Werte sind über alle Varianten hinweg dieselben
+(24/49/74). Die Strafe trifft also fast nur die ehrlichen Spieler, und deshalb
+ist die mildeste Variante, die den Abtipper noch aushungert, die richtige. Eine
+härtere (ein Fehler frei, 1 s je weiterem) kostete den mittleren Spieler 4 Zahlen
+mehr und den Abtipper nichts.
+
+Was bleibt: Wer 30 Sekunden lang zwölf Mal pro Sekunde tippt, landet bei ~74
+Zahlen – unter dem mittleren Spieler, aber über dem langsamen. Dafür steht dann
+„rund 200 Fehler" in der Zeile. Ganz ausschließen lässt sich das nicht, ohne
+ehrliches Spiel zu bestrafen; `test/balance.test.mjs` hält fest, dass der
+Abtipper unter dem mittleren Spieler bleibt und sein Lauf keine 30 Sekunden
+übersteht.
+
 ## Bestenliste
 
 Zwei Listen, dieselbe Wertung: die besten 50 Läufe **auf dem Gerät**
@@ -119,6 +184,11 @@ Eingabe bestrafen statt das Gedächtnis. Gespeichert werden ohnehin die
 Rohwerte (Runden, Zahlen, Fehler), nicht eine fertige Punktzahl: Eine spätere
 Wertung ließe sich damit rückwirkend nachrechnen, ohne dass jemand etwas neu
 spielen muss.
+
+Fehler sind damit kein Ranking-Faktor – sie zu einem zu machen wäre auch der
+falsche Hebel gegen wildes Durchprobieren gewesen: Der Abtipper hat ja *mehr*
+Zahlen, ein Stichentscheid bei Gleichstand hätte ihn nie erwischt. Dieses Problem
+gehört ins Spiel, nicht in die Bestenliste, und dort ist es gelöst (siehe oben).
 
 Abgekürzte Läufe (`?zeit=`, `?runde=`) zählen nicht – genau wie beim Rekord. Die
 Endkarte sagt das auch dort, wo sonst der Knopf wäre, statt es zu verschweigen.
@@ -205,10 +275,10 @@ js/main.js            verdrahtet alles und hält die Uhr am Laufen
 sw.js                 Service Worker: App-Shell im Cache, damit es offline läuft
 tools/balance.mjs     Simulation für die Balance (kein Teil der Web-App)
 test/game.test.mjs    Tests für Rundenplan, Regeln, Uhr, Pause
-test/balance.test.mjs hält die Balance grob an Ort und Stelle
+test/balance.test.mjs hält die Balance fest – und dass Abtippen kein Merken schlägt
 test/sw.test.mjs      prüft, dass der Cache wirklich alle Dateien kennt
-test/layout.test.mjs  misst im Browser, dass das Spielfeld still steht
-test/controls.test.mjs Ton-Schalter und Neustart im Browser
+test/layout.test.mjs  misst im Browser, dass das Spielfeld still steht und die Karten passen
+test/controls.test.mjs Ton-Schalter, Neustart und der verschwiegene Fehltipp im Browser
 test/scores.test.mjs  Wertung, Reihenfolge, Gleichstand, kaputte Daten
 test/leaderboard.test.mjs  die Netzschicht gegen einen gefälschten `fetch`
 test/leaderboard-ui.test.mjs  die Bestenliste im Browser, inklusive 320-px-Maßen

@@ -174,6 +174,8 @@ button {
 }
 
 .bonus[data-on] { animation: bonus .9s ease-out; }
+/* Ein von Fehlern geschmaelerter Bonus ist kein Gewinn - also auch nicht gruen. */
+.bonus[data-cut] { color: var(--muted); }
 
 @keyframes bonus {
   0%   { opacity: 0; transform: translateY(5px); }
@@ -372,15 +374,22 @@ button {
 .sheet {
   position: fixed;
   inset: 0;
-  display: grid;
-  /* `minmax(0, 1fr)` ist hier nicht Kosmetik: Ohne die Spur waere die Spalte so
-     breit wie der groesste Inhalt der Karte, und das `width: min(100%, 420px)`
-     der Karte rechnete seine 100 % gegen genau diese Breite - die Karte waere
-     also so breit wie ihr breitester Inhalt statt so breit wie der Bildschirm.
-     Ein Eingabefeld bringt von Haus aus ~20 Zeichen Wunschbreite mit und hat
-     die Endkarte damit auf 320 px ueber den rechten Rand geschoben. */
-  grid-template-columns: minmax(0, 1fr);
-  place-items: center;
+  /* Spalte plus `margin: auto` an der Karte (statt `place-items: center`), und
+     zwar aus zwei Gruenden:
+
+     1. Passt die Karte nicht auf den Bildschirm, muss die Lade scrollen. Auf
+        einem 320x568-Display stand der "Spiel starten"-Knopf sonst bei 626 px
+        und war schlicht nicht erreichbar. Ein zentrierter Grid-Inhalt, der
+        ueberlaeuft, laesst sich NICHT herunterscrollen - `margin: auto` in
+        einer Flex-Spalte schon.
+     2. Eine zentrierte Grid-Spur ist so breit wie der groesste Inhalt, und das
+        `width: min(100%, 420px)` der Karte rechnete seine 100 % gegen genau
+        diese Breite. Die Wunschbreite eines Eingabefeldes (~20 Zeichen) schob
+        die Endkarte damit auf 320 px ueber den rechten Rand. */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   background: color-mix(in srgb, var(--bg) 86%, transparent);
   backdrop-filter: blur(10px);
@@ -394,6 +403,7 @@ button {
 
 .card {
   width: min(100%, 420px);
+  margin: auto; /* zentriert und trotzdem scrollbar - siehe .sheet */
   padding: 28px 24px 24px;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -586,7 +596,9 @@ button {
 .card--scores {
   display: flex;
   flex-direction: column;
+  /* Die Liste scrollt in sich; die Karte selbst bleibt im Bild. */
   max-height: min(78svh, 620px);
+  flex: none;
 }
 
 .tabs {

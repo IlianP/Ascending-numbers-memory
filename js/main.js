@@ -89,9 +89,11 @@ function paintClock() {
   el.clockFill.style.transform = `scaleX(${share})`;
 }
 
-/** Gewonnene Sekunden kurz neben der Uhr zeigen. */
+/** Gewonnene Sekunden kurz neben der Uhr zeigen - auch, wenn es keine waren. */
 function showBonus(ms) {
   el.bonus.textContent = `+${Math.round(ms / 1000)} s`;
+  // Ein geschmaelerter Bonus soll sich nicht wie ein Gewinn anfuehlen.
+  el.bonus.toggleAttribute('data-cut', ms < CONFIG.levelBonusMs);
   el.bonus.removeAttribute('data-on');
   void el.bonus.offsetWidth; // Animation neu starten
   el.bonus.dataset.on = '1';
@@ -169,7 +171,7 @@ function nextLevel() {
 }
 
 function onTap(cell) {
-  const { result, value, levelDone } = game.tap(cell, now());
+  const { result, value, levelDone, bonusMs } = game.tap(cell, now());
 
   if (result === 'correct') {
     view.reveal(cell, value);
@@ -178,8 +180,12 @@ function onTap(cell) {
     fx.cue(levelDone ? 'level' : 'correct');
     if (levelDone) {
       view.celebrate();
+      // Angezeigt wird, was die Runde WIRKLICH eingebracht hat: Fehler knabbern
+      // am Bonus (siehe `levelBonus` in game.js). Auch die 0 wird gezeigt -
+      // sonst bliebe die Regel unsichtbar, und die stehengebliebene Uhr saehe
+      // nach einem Fehler aus wie ein Aussetzer.
       if (game.config.levelBonusMs) {
-        showBonus(game.config.levelBonusMs);
+        showBonus(bonusMs);
         paintClock();
       }
       view.after('level', CONFIG.levelBreakMs, () => {
@@ -187,7 +193,7 @@ function onTap(cell) {
       });
     }
   } else if (result === 'wrong') {
-    view.blunder(cell, value, CONFIG.wrongRevealMs);
+    view.blunder(cell, CONFIG.wrongRevealMs);
     flash('no');
     fx.cue('wrong');
     paintClock();

@@ -93,3 +93,41 @@ test('Taste N startet ein neues Spiel', { skip: missing }, async () => {
     await page.close();
   }
 });
+
+test('ein Fehltipp verraet die Zahl des Feldes nicht', { skip: missing }, async () => {
+  // Hier lag das groesste Loch des Spiels: Die falsch getippte Kachel zeigte
+  // ihre Zahl 380 ms lang an. Einmal quer ueber das Brett getippt, und die
+  // ganze Belegung war bekannt - das Merken war damit optional.
+  const page = await openGame();
+  try {
+    await page.click('#btn-start');
+    await page.wait(400);
+
+    const belegung = await page.evaluate(`[...document.querySelectorAll('#board .tile')]
+      .map((t) => ({ cell: t.dataset.cell, value: Number(t.textContent) }))`);
+    const falsch = belegung.find((t) => t.value > 1); // liegt dort, wo nicht die 1 liegt
+
+    await page.click('#action');
+    await page.wait(400);
+    await page.click(`#board .tile[data-cell="${falsch.cell}"]`);
+    await page.wait(120);
+
+    const kachel = await page.evaluate(`(() => {
+      const t = document.querySelector('#board .tile[data-cell="${falsch.cell}"]');
+      return { state: t.dataset.state, text: t.textContent.trim() };
+    })()`);
+
+    assert.equal(kachel.state, 'wrong', 'der Fehltipp muss sichtbar sein');
+    assert.equal(kachel.text, '', `die Kachel verraet ihre Zahl (${kachel.text})`);
+    assert.equal(
+      await page.evaluate(`[...document.querySelectorAll('#board .tile')]
+        .map((t) => t.textContent.trim()).join('')`),
+      '',
+      'auch sonst darf jetzt keine Zahl offen liegen',
+    );
+
+    assert.deepEqual(page.errors, []);
+  } finally {
+    await page.close();
+  }
+});

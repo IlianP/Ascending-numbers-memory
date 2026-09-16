@@ -23,3 +23,29 @@ test('Durchläufe enden und belohnen Können', () => {
   assert.ok(of('mittel').levels > of('langsam').levels);
   assert.ok(of('schnell').maxGrid >= 4, 'gutes Spiel muss aus dem 3x3-Raster herauskommen');
 });
+
+/**
+ * Der Grund fuer den schrumpfenden Rundenbonus. Ohne ihn kam der Abtipper
+ * weiter als jeder Mensch: Sich durch eine Runde zu tippen war billiger als die
+ * vier Sekunden, die es einbrachte - der Lauf finanzierte sich selbst. Geprueft
+ * wird an `found`, denn das ist es, was in der Bestenliste steht.
+ */
+test('Abtippen schlaegt kein Merken', () => {
+  const rows = evaluate(CONFIG, 40);
+  const found = (name) => rows.find((row) => row.player === name).found;
+
+  for (const rate of [4, 8, 12]) {
+    assert.ok(
+      found(`Abtipper ${rate}/s`) < found('mittel'),
+      `Abtipper mit ${rate} Tipps/s kommt auf ${found(`Abtipper ${rate}/s`)} Zahlen ` +
+      `und damit weiter als der mittlere Spieler (${found('mittel')})`,
+    );
+  }
+
+  // Und er verhungert an der Startzeit, statt sich Zeit zu erspielen.
+  const lauf = rows.find((row) => row.player === 'Abtipper 12/s');
+  assert.ok(
+    lauf.seconds < CONFIG.totalMs / 1000 + 5,
+    `der Abtipper haelt sich ${lauf.seconds}s am Leben, erwartet waren rund ${CONFIG.totalMs / 1000}s`,
+  );
+});

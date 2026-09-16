@@ -137,3 +137,42 @@ for (const width of [320, 360, 390]) {
     }
   });
 }
+
+/**
+ * Auf einem kleinen Display passt die Startkarte nicht mehr komplett ins Bild -
+ * dann muss die Lade scrollen. Anlass: Bei 320x568 lag der "Spiel starten"-Knopf
+ * bei 626 px und war schlicht nicht erreichbar; das Spiel liess sich dort gar
+ * nicht starten. Ein zentrierter Inhalt, der ueberlaeuft, laesst sich nicht
+ * herunterscrollen - deshalb `margin: auto` in einer Flex-Spalte statt
+ * `place-items: center`.
+ */
+for (const [width, height] of [[320, 568], [360, 640], [390, 780]]) {
+  test(`Startkarte ist bei ${width}x${height} bedienbar`, { skip: missing }, async () => {
+    const page = await openGame('/index.html', { width, height });
+    try {
+      const oben = await page.evaluate(
+        `+document.getElementById('card-intro').getBoundingClientRect().top.toFixed(1)`);
+      assert.ok(oben >= 0, `die Karte ist oben abgeschnitten (${oben} px)`);
+
+      // Ganz nach unten scrollen - danach muss der Startknopf vollstaendig da sein.
+      await page.evaluate(`(() => {
+        const sheet = document.getElementById('sheet');
+        sheet.scrollTop = sheet.scrollHeight;
+        return true;
+      })()`);
+      const knopf = await page.rect('#btn-start');
+      assert.ok(knopf.top >= 0 && knopf.top + knopf.height <= height,
+        `der Startknopf ist nicht erreichbar (${knopf.top} bis ${knopf.top + knopf.height} bei ${height} px)`);
+
+      // Und er muss auch wirklich klickbar sein, nicht nur sichtbar.
+      await page.click('#btn-start');
+      await page.wait(400);
+      assert.equal(await page.evaluate(`document.getElementById('hud').dataset.on`), '1',
+        'der Startknopf laesst sich nicht druecken');
+
+      assert.deepEqual(page.errors, []);
+    } finally {
+      await page.close();
+    }
+  });
+}
