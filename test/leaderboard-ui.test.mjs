@@ -249,3 +249,64 @@ test('ein Uebungslauf sagt, dass er nicht zaehlt – und Tippen startet kein neu
     await page.close();
   }
 });
+
+/**
+ * Zwei Wege, auf denen ein fertiger Lauf verloren ging. Beide brauchen einen
+ * Lauf, der wirklich zaehlt - und der dauert die volle Startzeit, weil eine
+ * abgeschlossene Runde Zeit dazugeben wuerde. Deshalb steckt beides in einem
+ * Test: einmal 30 Sekunden, zwei Befunde.
+ */
+test('ein fertiger Lauf ueberlebt das Schliessen der Seite und einen Neustart', { skip: missing }, async () => {
+  const page = await openGame();
+  try {
+    await page.click('#btn-start');
+    await page.wait(400);
+    const erste = await page.evaluate(`[...document.querySelectorAll('#board .tile')]
+      .find((t) => Number(t.textContent) === 1).dataset.cell`);
+    await page.click('#action');
+    await page.wait(300);
+    // Nur EINE Zahl: Eine fertige Runde brachte Bonuszeit und der Lauf liefe laenger.
+    await page.click(`#board .tile[data-cell="${erste}"]`);
+    await page.wait(31000);
+
+    assert.equal(await page.evaluate(hidden('#card-over')), false, 'die Endkarte muss da sein');
+    assert.equal(await page.evaluate(`document.getElementById('entry').hidden`), false,
+      'dieser Lauf zaehlt, also gibt es die Eintragen-Zeile');
+    assert.equal(await page.evaluate(`localStorage.getItem('ascending-numbers/scores/v1')`), null,
+      'vor dem Eintragen steht der Lauf noch nicht in der Liste');
+
+    // (1) Tab zu, ohne "Eintragen" zu druecken: Der Lauf muss trotzdem in der Liste landen.
+    await page.typeInto('#entry-name', 'Ida');
+    await page.evaluate(`(() => { window.dispatchEvent(new PageTransitionEvent('pagehide')); return true; })()`);
+    await page.wait(200);
+
+    const gespeichert = JSON.parse(
+      await page.evaluate(`localStorage.getItem('ascending-numbers/scores/v1')`) ?? 'null');
+    assert.ok(Array.isArray(gespeichert) && gespeichert.length === 1,
+      'der Lauf muss beim Verschwinden der Seite gesichert werden');
+    assert.equal(gespeichert[0].name, 'Ida', 'und zwar unter dem gerade getippten Namen');
+    assert.equal(gespeichert[0].found, 1);
+
+    // Die Karte lebt weiter: "Eintragen" muss danach noch funktionieren.
+    assert.equal(await page.evaluate(`document.getElementById('entry-submit').disabled`), false);
+
+    // (2) Eintragen, und mitten in der laufenden Anfrage ein neues Spiel starten.
+    await page.evaluate(`(() => {
+      window.fetch = () => new Promise((resolve) => setTimeout(() => resolve({
+        ok: true, status: 200, json: () => Promise.resolve([{ rank: 1, total: 1 }]),
+      }), 1500));
+      return true;
+    })()`);
+    await page.click('#entry-submit');
+    await page.wait(200);
+    await page.click('#btn-again');     // raeumt `pending` weg, waehrend die Antwort unterwegs ist
+    await page.wait(2500);              // Antwort trifft ein - auf einen Lauf, den es nicht mehr gibt
+
+    assert.deepEqual(page.errors, [], 'die verspaetete Antwort darf nichts umwerfen');
+    assert.equal(await page.evaluate(text('#level-pill')), 'Runde 1', 'das neue Spiel laeuft normal');
+    // `hideSheet()` blendet die Lade aus, nicht die einzelne Karte - also hier messen.
+    assert.equal(await page.evaluate(hidden('#sheet')), true, 'und die alte Endkarte ist weg');
+  } finally {
+    await page.close();
+  }
+});

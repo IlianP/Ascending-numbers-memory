@@ -55,7 +55,62 @@ create unique index if not exists ascending_scores_submission_id_unique
 alter table public.ascending_scores enable row level security;
 revoke all on public.ascending_scores from anon, authenticated;
 
--- 3) Eintragen ----------------------------------------------------------------
+-- 3) Wer ruft da an? -----------------------------------------------------------
+-- Schlüssel fürs Rate-Limit, ein täglich gesalzener Hash – die IP selbst wird
+-- nie gespeichert.
+--
+-- WICHTIG, UND EIN FRÜHERER FEHLER: `inet_client_addr()` allein taugt dafür
+-- nicht. Über die REST-Schnittstelle sitzt PostgREST (bzw. der Pooler) zwischen
+-- Browser und Datenbank, und die Funktion liefert dann dessen Adresse – für
+-- ALLE Spielenden dieselbe. Aus dem Limit "20 pro Minute und Client" wurde so
+-- eines von 20 pro Minute für die ganze Welt: Ein Einzelner konnte damit alle
+-- anderen aussperren, während er selbst kaum gebremst wurde. Genau das Gegenteil
+-- des Gewollten.
+--
+-- PostgREST reicht die Kopfzeilen der Anfrage als `request.headers` durch. Von
+-- dort kommt die echte Adresse: `cf-connecting-ip` (setzt das Edge-Netz, der
+-- Browser kann sie nicht überschreiben), sonst der erste Eintrag aus
+-- `x-forwarded-for`, und erst zuletzt `inet_client_addr()` – etwa, wenn jemand
+-- die Funktion direkt im SQL-Editor aufruft.
+--
+-- Ehrlich dazu: Das ist eine grobe Bremse, keine Sicherheit. Fehlt
+-- `cf-connecting-ip` und fälscht jemand `x-forwarded-for`, landet er in einem
+-- eigenen Eimer statt in keinem – er umgeht damit sein eigenes Limit. Das ist
+-- der bessere Tausch: Lieber kommt ein Einzelner durch, als dass er alle
+-- anderen mitnimmt. Manipulationssicher ist die Liste ohnehin nicht (der
+-- Browser meldet sein Ergebnis selbst), und dafür ist sie auch nicht gedacht.
+--
+-- Die Funktion faengt alles ab: Ohne `request.headers`, mit kaputtem JSON oder
+-- ohne Netzadresse liefert sie trotzdem einen Schlüssel, statt den Eintrag
+-- scheitern zu lassen.
+create or replace function public.ascending_client_key()
+  returns text language plpgsql stable set search_path = public as $$
+declare
+  v_ip      text;
+  v_headers json;
+begin
+  begin
+    v_headers := nullif(current_setting('request.headers', true), '')::json;
+  exception when others then
+    v_headers := null; -- kein PostgREST oder unerwarteter Inhalt
+  end;
+
+  if v_headers is not null then
+    v_ip := nullif(btrim(coalesce(v_headers ->> 'cf-connecting-ip', '')), '');
+    if v_ip is null then
+      v_ip := nullif(btrim(split_part(coalesce(v_headers ->> 'x-forwarded-for', ''), ',', 1)), '');
+    end if;
+  end if;
+
+  if v_ip is null then
+    v_ip := coalesce(host(inet_client_addr()), '');
+  end if;
+
+  return md5(v_ip || '|' || current_date::text);
+end;
+$$;
+
+-- 4) Eintragen ----------------------------------------------------------------
 -- Gewertet wird `found` (gefundene Zahlen), absteigend. Begründung steht in
 -- js/scores.js: Wer mehr Runden schafft, hat zwangsläufig mehr Zahlen gefunden,
 -- also ordnet `found` genau wie `levels` – nur feiner. `levels` und `mistakes`
@@ -103,9 +158,10 @@ begin
     from public.ascending_scores s where s.submission_id = p_submission_id;
 
   if not found then
-    -- Best-Effort-Rate-Limit: gesalzener Tageshash der Client-IP, max. 20/Minute.
-    -- Hinter dem Supabase-Pooler kann die IP grob sein – daher bewusst locker.
-    v_key := md5(coalesce(host(inet_client_addr()), '') || '|' || current_date::text);
+    -- Best-Effort-Rate-Limit: max. 20 Einträge pro Minute und Client. Woher der
+    -- Schlüssel kommt und warum nicht aus `inet_client_addr()`, steht bei
+    -- ascending_client_key() in Abschnitt 3.
+    v_key := ascending_client_key();
     select count(*) into v_recent from public.ascending_scores
       where client_key = v_key and created_at > now() - interval '1 minute';
     if v_recent >= 20 then raise exception 'rate limited'; end if;
@@ -141,7 +197,7 @@ begin
 end;
 $$;
 
--- 4) Lesen (nur unbedenkliche Spalten, bester zuerst) -------------------------
+-- 5) Lesen (nur unbedenkliche Spalten, bester zuerst) -------------------------
 -- created_at fährt mit: Die Oberfläche zeigt daneben das Alter ("vor 3 Tagen").
 -- Der Zeitpunkt einer Übermittlung verrät nichts über die Person, und ohne ihn
 -- wirkt eine Liste eingefroren.
@@ -159,12 +215,39 @@ create or replace function public.ascending_top_scores(
     limit least(greatest(coalesce(p_limit, 10), 1), 100);
 $$;
 
--- 5) Ausführrechte nur für diese beiden Funktionen -----------------------------
+-- 6) Ausführrechte nur für diese beiden Funktionen -----------------------------
 grant execute on function public.ascending_submit_score(text, text, int, int, int, uuid) to anon;
 grant execute on function public.ascending_top_scores(text, int) to anon;
 
+-- Postgres gibt neuen Funktionen von sich aus ein EXECUTE fuer PUBLIC mit.
+-- ascending_client_key() ist Innenleben und wird nur aus submit_score heraus
+-- gerufen (das laeuft als Eigentümer, braucht also kein Recht für anon).
+revoke all on function public.ascending_client_key() from public, anon, authenticated;
+
 -- MIGRATION -------------------------------------------------------------------
--- 2026-09: Ersteinrichtung. Es gibt noch nichts zu migrieren.
+-- 2026-09: Rate-Limit pro Client statt pro Datenbankverbindung. Die ganze Datei
+-- erneut ausführen; bestehende Zeilen bleiben unverändert.
+--
+--   Vorher stand in submit_score:
+--     v_key := md5(coalesce(host(inet_client_addr()), '') || '|' || current_date::text);
+--
+--   Über die REST-Schnittstelle ist das die Adresse von PostgREST, nicht die des
+--   Browsers – also für alle dieselbe. Das Limit galt damit global: 20 Einträge
+--   pro Minute für sämtliche Spielenden zusammen, und wer es ausschöpfte, sperrte
+--   alle anderen aus. Neu kommt der Schlüssel aus ascending_client_key()
+--   (Abschnitt 3). Bereits gespeicherte client_key-Werte bleiben stehen; sie
+--   fallen nach einem Tag ohnehin aus dem Zeitfenster.
+--
+--   Nachprüfen lässt sich die Wirkung, sobald zwei verschiedene Geräte etwas
+--   eingetragen haben – dann muss es mehr als einen Schlüssel geben:
+--
+--     select count(distinct client_key) as schluessel, count(*) as zeilen
+--       from public.ascending_scores where created_at > now() - interval '1 day';
+--
+--   Steht dort dauerhaft 1 bei mehreren Geräten, erreichen die Kopfzeilen die
+--   Funktion nicht, und es bleibt beim alten Verhalten (ein gemeinsamer Eimer).
+--
+-- 2026-09: Ersteinrichtung.
 --
 -- Solange diese Datei NICHT ausgeführt wurde, antwortet PostgREST auf beide
 -- Funktionen mit 404. Das Spiel fällt dann still auf die Liste im Gerät zurück:

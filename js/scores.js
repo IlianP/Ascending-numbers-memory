@@ -43,6 +43,18 @@ export const MAX_NAME_LENGTH = 20;
 
 const KEY = 'ascending-numbers/scores/v1';
 
+/**
+ * Notfall-Liste im Arbeitsspeicher. Sie wird gesetzt, sobald ein Schreibversuch
+ * scheitert (Privatmodus, voller Speicher), und ab dann bevorzugt gelesen.
+ *
+ * Ohne sie war das Versprechen "dann haelt die Liste eben nur diese Sitzung"
+ * schlicht falsch: Der Eintrag wurde gemeldet und beim naechsten Lesen war er
+ * weg - die Oberflaeche sagte "gespeichert" und markierte eine fremde Zeile.
+ * Entweder die Liste haelt die Sitzung, oder man muesste es ehrlich anders
+ * sagen; das hier ist die freundlichere Haelfte.
+ */
+let sessionList = null;
+
 /** Whitespace zusammenfassen, kürzen. Leer bleibt leer – siehe `renderScores` in main.js. */
 export function sanitizeName(name) {
   return String(name == null ? '' : name).replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_LENGTH);
@@ -73,6 +85,9 @@ function normalizeEntry(e) {
 
 /** Die ganze Liste lesen, Kaputtes still verwerfen. Wirft nie (Privatmodus!). */
 export function loadLocalScores() {
+  // Hat das Speichern einmal nicht geklappt, ist der Arbeitsspeicher die
+  // Wahrheit - im `localStorage` steht dann ein aelterer Stand.
+  if (sessionList) return sessionList.slice();
   try {
     const raw = localStorage.getItem(KEY);
     if (!raw) return [];
@@ -99,8 +114,12 @@ export function saveLocalScore(entry) {
 
   try {
     localStorage.setItem(KEY, JSON.stringify(trimmed));
+    sessionList = null; // wieder beschreibbar: der Speicher fuehrt jetzt wieder
   } catch {
-    /* kein Speicher (Privatmodus) – dann hält die Liste eben nur diese Sitzung */
+    // Kein Speicher (Privatmodus, Kontingent voll). Den Eintrag hier fallen zu
+    // lassen hiesse, einen Platz zu melden, den es beim naechsten Lesen nicht
+    // mehr gibt - also haelt ihn wenigstens die Sitzung.
+    sessionList = trimmed;
   }
   return { list: trimmed, rank: trimmed.indexOf(norm) };
 }
