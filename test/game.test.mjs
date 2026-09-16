@@ -202,6 +202,56 @@ test('Rundenbonus landet auf der Uhr', () => {
   assert.equal(game.remaining(0), 14_000);
 });
 
+test('Rundenbonus schrumpft mit den Fehlern, aber nie unter null', () => {
+  const game = new Game({}, seeded(5));
+  // Reine Rechnung auf der Regel selbst - unabhaengig davon, wie man an die
+  // Fehler kommt. `bonusFreeMistakes` Fehler sind frei, danach kostet jeder.
+  const { levelBonusMs, bonusFreeMistakes, bonusPenaltyMs } = game.config;
+  assert.equal(game.levelBonus(0), levelBonusMs);
+  assert.equal(game.levelBonus(bonusFreeMistakes), levelBonusMs, 'die freien Fehler kosten nichts');
+  assert.equal(game.levelBonus(bonusFreeMistakes + 1), levelBonusMs - bonusPenaltyMs);
+  assert.equal(game.levelBonus(bonusFreeMistakes + 99), 0, 'der Bonus wird nie negativ');
+});
+
+test('wildes Durchprobieren verdient keine Zeit', () => {
+  // Der Schutz gegen das Abtippen: Wer eine Runde durchprobiert, schliesst sie
+  // zwar ab, bekommt dafuer aber nichts - und ohne neue Zeit ist der Durchlauf
+  // nach der Startzeit vorbei. Die Uhr darf dabei NICHT rueckwaerts gehen.
+  const game = new Game({}, seeded(11));
+  game.start(0);
+  const deadlineVorher = game.deadline;
+  game.hide();
+
+  let letzter = { bonusMs: 0 };
+  for (let n = 1; n <= game.board.count; n++) {
+    // erst alle falschen Felder abklappern, dann das richtige
+    for (let cell = 0; cell < game.board.tiles.length; cell++) {
+      if (game.board.tiles[cell] === n || game.revealed.has(cell)) continue;
+      game.tap(cell, 0);
+    }
+    letzter = game.tap(cellOf(game, n), 0);
+  }
+
+  assert.equal(letzter.levelDone, true, 'die Runde wurde abgeschlossen');
+  assert.equal(letzter.bonusMs, 0, 'aber sie bringt keine Zeit ein');
+  assert.equal(game.deadline, deadlineVorher, 'und sie kostet auch keine');
+  assert.ok(game.levelMistakes > game.config.bonusFreeMistakes);
+});
+
+test('Fehlerzaehler der Runde startet mit jeder Runde neu', () => {
+  const game = new Game({}, seeded(3));
+  game.start(0);
+  game.hide();
+  const falsch = game.board.tiles.findIndex((v) => v !== 1);
+  game.tap(falsch, 0);
+  assert.equal(game.levelMistakes, 1);
+
+  for (let n = 1; n <= game.board.count; n++) game.tap(cellOf(game, n), 0);
+  game.nextLevel();
+  assert.equal(game.levelMistakes, 0, 'die neue Runde faengt ohne Altlasten an');
+  assert.equal(game.mistakes, 1, 'der Gesamtzaehler behaelt ihn aber');
+});
+
 test('abgelaufene Zeit nimmt keine Tipps mehr an', () => {
   const game = new Game({ totalMs: 1000, levelBonusMs: 4000 }, seeded(23));
   game.start(0);

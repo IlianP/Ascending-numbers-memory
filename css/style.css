@@ -174,6 +174,8 @@ button {
 }
 
 .bonus[data-on] { animation: bonus .9s ease-out; }
+/* Ein von Fehlern geschmaelerter Bonus ist kein Gewinn - also auch nicht gruen. */
+.bonus[data-cut] { color: var(--muted); }
 
 @keyframes bonus {
   0%   { opacity: 0; transform: translateY(5px); }
@@ -372,8 +374,22 @@ button {
 .sheet {
   position: fixed;
   inset: 0;
-  display: grid;
-  place-items: center;
+  /* Spalte plus `margin: auto` an der Karte (statt `place-items: center`), und
+     zwar aus zwei Gruenden:
+
+     1. Passt die Karte nicht auf den Bildschirm, muss die Lade scrollen. Auf
+        einem 320x568-Display stand der "Spiel starten"-Knopf sonst bei 626 px
+        und war schlicht nicht erreichbar. Ein zentrierter Grid-Inhalt, der
+        ueberlaeuft, laesst sich NICHT herunterscrollen - `margin: auto` in
+        einer Flex-Spalte schon.
+     2. Eine zentrierte Grid-Spur ist so breit wie der groesste Inhalt, und das
+        `width: min(100%, 420px)` der Karte rechnete seine 100 % gegen genau
+        diese Breite. Die Wunschbreite eines Eingabefeldes (~20 Zeichen) schob
+        die Endkarte damit auf 320 px ueber den rechten Rand. */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   background: color-mix(in srgb, var(--bg) 86%, transparent);
   backdrop-filter: blur(10px);
@@ -387,6 +403,7 @@ button {
 
 .card {
   width: min(100%, 420px);
+  margin: auto; /* zentriert und trotzdem scrollbar - siehe .sheet */
   padding: 28px 24px 24px;
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -511,6 +528,172 @@ button {
 }
 
 .best b { color: var(--fg); font-weight: 650; }
+
+/* ---------------------------------------------------------- bestenliste */
+/* Die Endkarte darf durch das Eintragen nicht zur Formularseite werden: eine
+   Zeile Rang, eine Zeile Eingabe, eine Zeile Status - und erst darunter wieder
+   der grosse Knopf, der in 99 % der Faelle der naechste Griff ist. */
+.rank-line {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.rank-line[hidden] { display: none; }
+.rank-line b { color: var(--fg); font-weight: 650; }
+
+.entry {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.entry[hidden] { display: none; }
+
+.entry__name {
+  /* Basis 6em statt `auto`: Die Wunschbreite eines Eingabefeldes (~20 Zeichen)
+     soll nicht mitreden, wie breit die Karte sein will. */
+  flex: 1 1 6em;
+  min-width: 0;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 15px;
+}
+
+.entry__name::placeholder { color: var(--muted); }
+
+.entry__submit {
+  flex: none;
+  padding: 11px 18px;
+  border: 1px solid var(--fg);
+  border-radius: 999px;
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 15px;
+  font-weight: 650;
+  transition: transform .1s ease, opacity .2s ease;
+}
+
+.entry__submit:active { transform: scale(.96); }
+.entry__submit[disabled] { opacity: .45; pointer-events: none; }
+
+.entry__status {
+  margin: 0 0 16px;
+  min-height: 1.3em;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.entry__status[data-tone="ok"] { color: var(--ok); }
+.entry__status[data-tone="err"] { color: var(--no); }
+
+/* Die Bestenliste ist eine eigene Karte in derselben Lade: Sie oeffnet sich
+   ueber der Start- oder Endkarte und kehrt beim Schliessen dorthin zurueck. */
+.card--scores {
+  display: flex;
+  flex-direction: column;
+  /* Die Liste scrollt in sich; die Karte selbst bleibt im Bild. */
+  max-height: min(78svh, 620px);
+  flex: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+}
+
+.tab {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background .15s ease, color .15s ease;
+}
+
+.tab[hidden] { display: none; }
+.tab[aria-selected="true"] {
+  background: var(--face-bg);
+  color: var(--fg);
+  box-shadow: var(--shadow);
+}
+
+/* Die Liste ist der einzige Teil, der schrumpfen darf - so bleibt die Karte
+   gleich hoch, egal ob drei oder fuenfzig Zeilen drinstehen. */
+.score-list {
+  flex: 1;
+  min-height: 84px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+  text-align: left;
+  -webkit-overflow-scrolling: touch;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 2.1em minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  font-size: 15px;
+}
+
+.score-row + .score-row { margin-top: 2px; }
+.score-row:nth-child(odd) { background: color-mix(in srgb, var(--fg) 4%, transparent); }
+
+/* Die eigene Zeile. Nicht nur Farbe: Ein Rahmen bleibt auch dann erkennbar,
+   wenn die Liste weit gescrollt ist oder jemand Farben schlecht unterscheidet. */
+.score-row.me {
+  outline: 2px solid var(--ok);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--ok) 12%, transparent);
+}
+
+.score-rank {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.score-val {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.score-val b { color: var(--fg); font-weight: 700; font-size: 15px; }
+
+.score-note {
+  padding: 24px 10px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
 
 /* --------------------------------------------------------------- a11y/motion */
 @media (prefers-reduced-motion: reduce) {

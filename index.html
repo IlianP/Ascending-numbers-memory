@@ -76,9 +76,10 @@
       </p>
       <ul class="rules">
         <li><b>30&nbsp;Sekunden</b> Startzeit</li>
-        <li>Jede geschaffte Runde bringt <b>4&nbsp;Sekunden</b> dazu</li>
+        <li>Jede geschaffte Runde bringt bis zu <b>4&nbsp;Sekunden</b> dazu</li>
+        <li>Ab dem <b>dritten Fehler</b> einer Runde schrumpft dieser Bonus</li>
         <li>Jede zweite Runde kommt <b>eine Zahl dazu</b></li>
-        <li>Fehler kosten nur Zeit &ndash; also: ruhig bleiben</li>
+        <li>Die Uhr geht nie r&uuml;ckw&auml;rts &ndash; also: ruhig bleiben</li>
       </ul>
       <button class="action action--lg" id="btn-start" type="button">Spiel starten</button>
       <div class="chips">
@@ -90,6 +91,16 @@
             <path class="icon-mute" d="M16 9.5l5 5m0-5l-5 5"/>
           </svg>
           <span class="chip__label">Ton an</span>
+        </button>
+        <button class="chip" id="chip-scores-intro" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4h10v5a5 5 0 0 1-10 0z"/>
+            <path d="M7 6H4.5v1.5A3.5 3.5 0 0 0 8 11"/>
+            <path d="M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11"/>
+            <path d="M12 14v3m-3.5 3h7"/>
+          </svg>
+          <span class="chip__label">Bestenliste</span>
         </button>
       </div>
       <p class="best" id="best-intro"></p>
@@ -103,6 +114,19 @@
         <div class="stat"><b id="stat-found">28</b><span>Zahlen</span></div>
         <div class="stat"><b id="stat-mistakes">3</b><span>Fehler</span></div>
       </div>
+
+      <!-- Eintragen: Der Lauf ist schon gezaehlt, hier bekommt er nur einen Namen.
+           Die Zeile bleibt auch dann stehen, wenn kein Server erreichbar ist -
+           gespeichert wird immer zuerst auf dem Geraet. -->
+      <p class="rank-line" id="rank-line" hidden></p>
+      <div class="entry" id="entry" hidden>
+        <input class="entry__name" id="entry-name" type="text" maxlength="20"
+               placeholder="Dein Name" aria-label="Dein Name f&uuml;r die Bestenliste"
+               autocomplete="nickname" enterkeyhint="done" spellcheck="false">
+        <button class="entry__submit" id="entry-submit" type="button">Eintragen</button>
+      </div>
+      <p class="entry__status" id="entry-status" aria-live="polite"></p>
+
       <button class="action action--lg" id="btn-again" type="button">Nochmal spielen</button>
       <div class="chips">
         <button class="chip" id="chip-sound-over" type="button" aria-pressed="true">
@@ -114,8 +138,30 @@
           </svg>
           <span class="chip__label">Ton an</span>
         </button>
+        <button class="chip" id="chip-scores-over" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4h10v5a5 5 0 0 1-10 0z"/>
+            <path d="M7 6H4.5v1.5A3.5 3.5 0 0 0 8 11"/>
+            <path d="M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11"/>
+            <path d="M12 14v3m-3.5 3h7"/>
+          </svg>
+          <span class="chip__label">Bestenliste</span>
+        </button>
       </div>
       <p class="best" id="best-over"></p>
+    </div>
+
+    <div class="card card--scores" id="card-scores" hidden>
+      <h2>Bestenliste</h2>
+      <div class="tabs" role="tablist" aria-label="Bestenliste w&auml;hlen">
+        <button class="tab" id="tab-local" type="button" role="tab" aria-selected="true"
+                aria-controls="score-list">Auf dem Ger&auml;t</button>
+        <button class="tab" id="tab-global" type="button" role="tab" aria-selected="false"
+                aria-controls="score-list" hidden>Global &#127760;</button>
+      </div>
+      <div class="score-list" id="score-list" role="tabpanel"></div>
+      <button class="action action--lg" id="btn-scores-close" type="button">Zur&uuml;ck</button>
     </div>
 
     <div class="card card--slim" id="card-pause" hidden>
